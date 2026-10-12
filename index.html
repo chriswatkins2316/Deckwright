@@ -287,9 +287,10 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 
     <div class="panel" id="scanPanel">
       <h2>Scan cards</h2>
-      <p class="small muted">Point your camera at a card and Claude reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
-      <div class="row btnrow"><button class="primary" id="scanStart" data-claude>Start camera</button>
-        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer" data-claude>Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <p class="small muted">Point your camera at a card and the app reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
+      <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
+        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <div id="scanMode"></div>
       <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
       <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan cards when held still</label>
       <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
@@ -2148,7 +2149,6 @@ Use "" for anything you can't read.`, { modelTier:"default", cache:false, images
 let scanStream = null, scanBusy = 0;
 function stopScan(){ autoStop(); if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const cam = $("#scanCam"); if (cam) cam.hidden = true; const st = $("#scanStart"); if (st) st.hidden = false; }
 $("#scanStart").onclick = async () => {
-  if (!S.sample) return showKeyNeeded("#scanStatus");
   try {
     scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
     $("#scanVideo").srcObject = scanStream; $("#scanCam").hidden = false; $("#scanStart").hidden = true; $("#scanStatus").innerHTML = "";
@@ -2213,13 +2213,13 @@ $("#scanSnap").onclick = () => {
 };
 $("#scanFile").addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  if (!S.sample) return showKeyNeeded("#scanStatus");
   const img = new Image(); img.onload = () => { scanImage(frameToJpeg(img, img.naturalWidth, img.naturalHeight), $("#scanFoil").checked); URL.revokeObjectURL(img.src); };
   img.onerror = () => { $("#scanStatus").innerHTML = `<div class="notice bad">That photo couldn't be opened.</div>`; };
   img.src = URL.createObjectURL(f);
 });
 function scanSay(){ $("#scanStatus").innerHTML = scanBusy ? `<div class="progress" style="margin-top:8px"><div class="spin"></div><span>Reading ${scanBusy} card photo${scanBusy > 1 ? "s" : ""}… you can keep scanning.</span></div>` : ""; }
 async function scanImage(data, foil, auto){
+  if (!S.sample) return scanImageLocal(data, foil, auto);
   scanBusy++; scanSay();
   try {
     const r = await S.sample.json(`This photo shows one or more Magic: The Gathering cards. Identify each card that is clearly visible.
@@ -2237,6 +2237,113 @@ Use "" for anything you can't read, and confidence "high", "medium" or "low". If
     flashScan(errText(e), "bad");
   } finally { scanBusy--; scanSay(); }
 }
+/* ---------- scanning without a Claude key: on-device text reading ---------- */
+// Tesseract (open source OCR) reads the text in the photo on the phone itself, then the card name
+// is matched against the card list. Free and offline after the first download, but less accurate.
+const OCR_MAX = 1000;
+const OCR_LIB = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
+let ocrWorker = null, nameGrams = null;
+function ocrReady(){
+  if (!ocrWorker) ocrWorker = (async () => {
+    if (!window.Tesseract) await new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = OCR_LIB; sc.onload = ok; sc.onerror = () => bad(new Error("couldn't download the text reader. Connect to the internet once so it can be saved")); document.head.appendChild(sc); });
+    return Tesseract.createWorker("eng", 1, {
+      workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js",
+      corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@6.1.2",
+      langPath:"https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int" });
+  })().catch(e => { ocrWorker = null; throw e; });
+  return ocrWorker;
+}
+const tri = s => { const p = `^${s}$`, out = new Set(); for (let k = 0; k + 3 <= p.length; k++) out.add(p.slice(k, k + 3)); return out; };
+function buildNameGrams(){
+  const idx = new Map(), names = [];
+  S.cards.forEach((c, i) => {
+    const n = norm(c[C.name].split(" // ")[0]); if (n.length < 3) return;
+    const id = names.push([n, i]) - 1;
+    for (const g of tri(n)) { let a = idx.get(g); if (!a) idx.set(g, a = []); a.push(id); }
+  });
+  return { idx, names };
+}
+function lev(a, b){
+  const m = a.length, n = b.length; if (!m || !n) return Math.max(m, n);
+  let prev = Array.from({ length:n + 1 }, (_, k) => k);
+  for (let x = 1; x <= m; x++) { const cur = [x]; for (let y = 1; y <= n; y++) cur[y] = Math.min(prev[y] + 1, cur[y - 1] + 1, prev[y - 1] + (a[x - 1] === b[y - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+// best card name for one line of text: [cardIndex, similarity 0..1]
+function matchName(text){
+  const q = norm(text); if (q.length < 3) return null;
+  const exact = S.byNorm.get(q); if (exact !== undefined) return [exact, 1];
+  if (q.length < 5) return null;
+  nameGrams = nameGrams || buildNameGrams();
+  const qg = tri(q), hits = new Map();
+  for (const g of qg) for (const id of nameGrams.idx.get(g) || []) hits.set(id, (hits.get(id) || 0) + 1);
+  const top = [...hits].map(([id, h]) => [id, 2 * h / (qg.size + nameGrams.names[id][0].length)]).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  let best = null;
+  for (const [id] of top) { const [n, i] = nameGrams.names[id], r = 1 - lev(q, n) / Math.max(q.length, n.length); if (!best || r > best[1]) best = [i, r]; }
+  return best;
+}
+function ocrCandidates(line){
+  const words = line.replace(/[^A-Za-z0-9',\- ]+/g, " ").split(/\s+/).filter(Boolean);
+  const out = new Set([words.join(" ")]);
+  for (let a = 0; a <= Math.min(2, words.length - 1); a++) for (let b = words.length; b >= Math.max(a + 1, words.length - 3); b--) out.add(words.slice(a, b).join(" "));
+  return [...out].filter(x => x.replace(/[^A-Za-z]/g, "").length >= 3);
+}
+async function scanImageLocal(data, foil, auto){
+  scanBusy++; scanSay();
+  const firstTime = !window.Tesseract;
+  if (firstTime) $("#scanStatus").innerHTML = `<div class="progress" style="margin-top:8px"><div class="spin"></div><span>Getting the text reader ready. This happens once.</span></div>`;
+  try {
+    const w = await ocrReady();
+    const { data:r } = await w.recognize(await ocrImage(data), {}, { text:true, blocks:true });
+    const lines = [];
+    for (const b of r.blocks || []) for (const p of b.paragraphs || []) for (const l of p.lines || []) if (l.text.trim()) lines.push({ text:l.text.trim(), y:l.bbox.y0, conf:l.confidence });
+    if (!lines.length) { if (auto) { autoPill("No text seen. Try more light"); return; } flashScan("Couldn't read any text. Try brighter light with the card name clearly in view.", "warn"); return; }
+    const y0 = Math.min(...lines.map(l => l.y)), y1 = Math.max(...lines.map(l => l.y)) || 1;
+    let best = null;
+    for (const l of lines) {
+      const pos = 1 - 0.25 * ((l.y - y0) / Math.max(1, y1 - y0));          // the name is the top line of the card
+      for (const cand of ocrCandidates(l.text)) {
+        const m = matchName(cand); if (!m || m[1] < 0.72) continue;
+        const sc = m[1] * pos * (0.85 + 0.15 * Math.min(1, norm(cand).length / 10));
+        if (!best || sc > best.sc) best = { i:m[0], sim:m[1], sc, conf:l.conf };
+      }
+    }
+    if (!best) { if (auto) { autoPill("Couldn't read the name. Hold steadier"); return; } flashScan("Couldn't make out the card name. Try brighter light, hold it flat and keep the name in view.", "warn"); return; }
+    const all = r.text || lines.map(l => l.text).join("\n");
+    const setM = all.match(/\b([A-Z0-9]{3,5})\s*[•·*.,+]?\s*EN\b/), cnM = all.match(/\b(\d{1,4})\s*\/\s*\d{2,4}\b/) || all.match(/(?:^|\s)(0\d{2,3})(?:\s|$)/m);
+    const sets = LS.get("dw.sets")?.sets;
+    let set = ocrSet(setM ? setM[1].toLowerCase() : "", sets), cn = set && cnM ? cnM[1] : "";
+    const sure = best.sim >= 0.95 && best.conf >= 70;
+    const n = await addScanned({ name:card(best.i)[C.name], set, collector_number:cn, confidence: sure ? "high" : "medium", ocr:true }, foil);
+    if (n && auto) { AUTO.last = n; if (AUTO.timer && !AUTO.armed) autoPill(`${n} · swap in the next card`); }
+    return n;
+  } catch (e) {
+    flashScan("Scanning without Claude failed: " + (e?.message || e), "bad");
+  } finally {
+    scanBusy--; scanSay();
+  }
+}
+// smaller, greyscale copy: much faster to read and just as legible
+async function ocrImage(data){
+  const img = new Image(); img.src = "data:image/jpeg;base64," + data; await img.decode();
+  const sc = Math.min(1, OCR_MAX / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+  const g = c.getContext("2d"); g.filter = "grayscale(1) contrast(1.25)"; g.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+const OCR_FIX = { "1":"i", "0":"o", "5":"s", "8":"b", "l":"i" };
+function ocrSet(code, sets){
+  if (!code) return "";
+  if (!sets) return code;
+  if (sets[code]) return code;
+  for (let k = 0; k < code.length; k++) { const f = OCR_FIX[code[k]]; if (f) { const t = code.slice(0, k) + f + code.slice(k + 1); if (sets[t]) return t; } }
+  const all = code.replace(/[1058l]/g, ch => OCR_FIX[ch]); return sets[all] ? all : "";
+}
+function renderScanMode(){
+  const box = $("#scanMode"); if (!box) return;
+  box.innerHTML = S.sample ? "" : `<div class="notice small"><b>No Claude key, so your phone reads the cards itself.</b> It's free and works offline after a one-time download of about 7 MB, but it's less accurate: English cards only, it needs good light and the name clearly in view, and it often can't read the set and number. Cards it isn't sure about are marked <span class="flag">check this</span>. <b>Add a Claude key in Settings for much better accuracy.</b></div>`;
+}
+
 function flashScan(t, k){ const b = document.createElement("div"); b.className = `notice ${k}`; b.textContent = t; $("#scanStatus").after(b); setTimeout(() => b.remove(), 6000); }
 async function addScanned(x, foil){
   let i = lookup(x.name), set = String(x.set || "").trim().toLowerCase(), cn = String(x.collector_number || "").trim().replace(/^#/, "").replace(/^0+(?=\d)/, "");
@@ -2249,7 +2356,7 @@ async function addScanned(x, foil){
   if (!/^[a-z0-9]{2,6}$/.test(set) || !cn) { set = ""; cn = ""; }
   if (set) {   // check the printing exists and is this card
     try { const r = await sfFetch(`https://api.scryfall.com/cards/${encodeURIComponent(set)}/${encodeURIComponent(cn)}`); if (r.ok) { const d = await r.json(); if (lookup(d.name) !== i) { set = ""; cn = ""; } } else { set = ""; cn = ""; } }
-    catch { /* offline: keep what Claude read */ }
+    catch { if (x.ocr) { set = ""; cn = ""; } /* offline: keep what Claude read, but not a guess from on-device reading */ }
   }
   const finish = foil ? "foil" : "normal";
   const same = S.scan.find(s => s.name === name && s.set === set && s.cn === cn && s.finish === finish);
@@ -3293,11 +3400,11 @@ function makeSampler(key){
   sample.limits = async () => ({ tools:{ maxCount:8 } });
   return sample;
 }
-function initClaude(){ const k = getKey(); S.sample = k ? makeSampler(k) : null; S.toolsOK = !!k; document.body.classList.toggle("nokey", !k); renderKeyBar(); }
+function initClaude(){ const k = getKey(); S.sample = k ? makeSampler(k) : null; S.toolsOK = !!k; document.body.classList.toggle("nokey", !k); renderKeyBar(); renderScanMode(); }
 function renderKeyBar(){
   const bar = $("#keyBar"); if (!bar) return;
   bar.hidden = !!S.sample || LS.get("dw.keybarX") === true;
-  bar.innerHTML = `<div class="notice keybar"><span class="small">No Claude key yet. Your collection, prices, checks and lookups all work. Things marked <b>✦ Needs key</b> use Claude.</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="mini primary" id="keyBarGo">Add key</button><button class="ghost mini" id="keyBarX" aria-label="Hide this">✕</button></span></div>`;
+  bar.innerHTML = `<div class="notice keybar"><span class="small">No Claude key yet. Your collection, prices, checks and lookups all work. Things marked <b>✦ Needs key</b> use Claude. Card scanning still works, less accurately.</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="mini primary" id="keyBarGo">Add key</button><button class="ghost mini" id="keyBarX" aria-label="Hide this">✕</button></span></div>`;
   $("#keyBarGo").onclick = () => showTab("settings");
   $("#keyBarX").onclick = () => { LS.set("dw.keybarX", true); bar.hidden = true; };
 }
@@ -3313,7 +3420,7 @@ function renderSettings(){
   const k = getKey();
   $("#keyState").innerHTML = k
     ? `<div class="notice ok">Key saved on this device (ends in …${esc(k.slice(-4))}).</div>`
-    : `<div class="notice warn">No key yet. Your collection, prices, the Check tab, card lookup, combos and test draws all work without one. Buttons marked ✦ use Claude and show <b>Needs key</b> until you add one.</div>`;
+    : `<div class="notice warn">No key yet. Your collection, prices, the Check tab, card lookup, combos and test draws all work without one, and card scanning falls back to your phone's own text reading. Buttons marked ✦ use Claude and show <b>Needs key</b> until you add one.</div>`;
   const m = window.MTG_DB?.meta || {};
   if ($("#comboDataInfo")) $("#comboDataInfo").textContent = COMBOS ? `${COMBOS.c.length.toLocaleString()} combos from Commander Spellbook${COMBOS.t ? ", updated " + String(COMBOS.t).slice(0, 10) : ""}.` : combosTried ? "No combo data yet. Run the GitHub job below once." : "";
   $("#cardDataInfo").textContent = S.cards.length

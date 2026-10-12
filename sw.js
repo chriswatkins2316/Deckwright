@@ -1,6 +1,7 @@
 // Deckwright offline support. Bump VERSION whenever any app file changes.
-const VERSION = "deckwright-v17";
+const VERSION = "deckwright-v18";
 const FONTS = "deckwright-fonts";
+const LIBS = "deckwright-libs";   // the on-device card reader, downloaded on first use
 const SHELL = ["./", "index.html", "cards.js", "manifest.webmanifest",
   "qrcode.js", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];
 
@@ -15,7 +16,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== FONTS).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== FONTS && k !== LIBS).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -56,6 +57,16 @@ self.addEventListener("fetch", e => {
       if (r.ok || r.type === "opaque") c.put(req, r.clone());
       return r;
     }));
+  }
+  if (url.hostname === "cdn.jsdelivr.net" && /\/npm\/(tesseract\.js|tesseract\.js-core|@tesseract\.js-data)@/.test(url.pathname)) {
+    e.respondWith(caches.open(LIBS).then(async c => {
+      const hit = await c.match(req);
+      if (hit) return hit;
+      const r = await fetch(req);
+      if (r.ok) c.put(req, r.clone());
+      return r;
+    }));
+    return;
   }
   // Anthropic and Scryfall requests go straight to the network.
 });
