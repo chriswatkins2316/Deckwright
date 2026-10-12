@@ -1301,9 +1301,9 @@ function deckFromCards(name, cmap, opts = {}){
 function binderPick(res){
   S.pendingBinders = [...(res.binders || new Map())];
   if (!S.pendingBinders.length) return "";
-  const looksDeck = (n, b) => /deck/i.test(b.type) || /deck/i.test(n) || [...b.cards.values()].reduce((a, q) => a + q, 0) >= 40;
+  const looksDeck = (n, b) => (/deck/i.test(b.type) || /deck/i.test(n)) && S.pendingBinders.length > 1;
   return `<div class="notice"><b>Your file has ${S.pendingBinders.length} binder${S.pendingBinders.length > 1 ? "s or lists" : " or list"}.</b> Tick the ones that are real, sleeved-up decks and they'll be saved as built decks.
-    <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">${S.pendingBinders.map(([n, b], k) => `<label class="row small"><input type="checkbox" data-binder="${k}" ${looksDeck(n, b) && !/trade|bulk|binder|collection|sell/i.test(n) ? "checked" : ""}> ${esc(n)} <span class="muted">(${[...b.cards.values()].reduce((a, q) => a + q, 0)} cards${b.type ? ", " + esc(b.type) : ""})</span></label>`).join("")}</div></div>`;
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">${S.pendingBinders.map(([n, b], k) => `<label class="row small"><input type="checkbox" data-binder="${k}" ${looksDeck(n, b) && !/^all$|trade|bulk|binder|collection|sell/i.test(n.trim()) ? "checked" : ""}> ${esc(n)} <span class="muted">(${[...b.cards.values()].reduce((a, q) => a + q, 0)} cards${b.type ? ", " + esc(b.type) : ""})</span></label>`).join("")}</div></div>`;
 }
 function saveCheckAsDeck(){
   const k = S.check; if (!k) return;
