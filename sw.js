@@ -1,5 +1,5 @@
 // Deckwright offline support. Bump VERSION whenever any app file changes.
-const VERSION = "deckwright-v6";
+const VERSION = "deckwright-v7";
 const FONTS = "deckwright-fonts";
 const SHELL = ["./", "index.html", "cards.js", "manifest.webmanifest",
   "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];

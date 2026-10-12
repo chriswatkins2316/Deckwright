@@ -411,10 +411,7 @@ function loadDB(){
   s.onload = () => {
     S.cards = window.MTG_DB.cards;
     applyOverlay();
-    S.cards.forEach((c,i) => {
-      S.byNorm.set(norm(c[0]), i);
-      if (c[0].includes(" // ")) { const f = norm(c[0].split(" // ")[0]); if (!S.byNorm.has(f)) S.byNorm.set(f, i); }
-    });
+    reindex();
     const m = { ...(window.MTG_DB.meta || {}), ...(S.overlayDate ? { date:S.overlayDate } : {}) };
     $("#dbstatus").textContent = `${S.cards.length.toLocaleString()} cards${m.source ? " from " + m.source : ""}${m.date ? " (" + m.date + ")" : ""} · works offline`;
     restoreLocal();
@@ -426,9 +423,9 @@ function loadDB(){
 function lookup(name){
   if (!name) return -1;
   let n = String(name).trim();
-  for (const cand of [n, n.split(" // ")[0], n.replace(/\s*\(.*?\)\s*/g," ").trim(), n.replace(/^A-/,"")]) {
-    const i = S.byNorm.get(norm(cand)); if (i !== undefined) return i;
-  }
+  const cands = [n, n.split(" // ")[0], n.replace(/\s*\(.*?\)\s*/g," ").trim(), n.replace(/^A-/,"")];
+  for (const cand of cands) { const i = S.byName?.get(cand.toLowerCase()); if (i !== undefined) return i; }
+  for (const cand of cands) { const i = S.byNorm.get(norm(cand)); if (i !== undefined) return i; }
   return -1;
 }
 const card = i => S.cards[i];
@@ -1040,7 +1037,7 @@ function runCheck(){
   const total = mainTotal + p.commanders.length;
   if (fmt === "commander" && total !== 100) issues.push(`The list has ${total} cards; Commander decks have exactly 100.`);
   if (fmt !== "commander" && total < 60) issues.push(`The list has ${total} cards; constructed decks need at least 60.`);
-  S.check = { fmt, rows, issues, identity, total, ignoreBasics, unknown:[...p.unknown], commanders:p.commanders, evalResult:null };
+  S.check = { fmt, rows, issues, identity, total, ignoreBasics, unknown:[...p.unknown].filter(([n]) => !isDigital(n)), digital:[...p.unknown].filter(([n]) => isDigital(n)), commanders:p.commanders, evalResult:null };
   renderCheck();
   fetchCheckPrices();
 }
@@ -1066,6 +1063,7 @@ function renderCheck(){
     <div class="costline"><div><span class="label">Cost to finish</span><b class="need">${money(missing.reduce((a,r) => a + r.missing * buyPrice(r.i), 0))}</b></div>
       <div><span class="label">Your cards in it</span><b>${money(k.rows.filter(r => r.status !== "basic").reduce((a,r) => a + Math.min(r.need, r.owned) * unitOwned(r.i), 0))}</b></div></div>
     ${missing.length ? `<p class="small muted">${k.priceState === "live" ? "Cheapest printing of each missing card on Scryfall (TCGplayer market prices)." : k.priceState === "offline" ? "Estimated from typical prices. Couldn't reach Scryfall for current ones." : "Estimated from typical prices. Getting current cheapest prices…"}</p>` : ""}
+    ${k.digital?.length ? `<div class="notice">${k.digital.length} Arena-only card${k.digital.length > 1 ? "s" : ""} with no paper version ${k.digital.length > 1 ? "were" : "was"} left out: ${esc(k.digital.map(([n]) => n).join(", "))}. Swap in paper cards that do the same job.</div>` : ""}
     ${k.unknown.length ? `<div class="notice warn">${k.unknown.length} line${k.unknown.length>1?"s":""} didn't match a card and ${k.unknown.length>1?"were":"was"} skipped: ${esc(k.unknown.slice(0,8).map(([n]) => n).join(", "))}${k.unknown.length>8?" …":""}</div>` : ""}
     ${k.issues.length ? `<div class="notice bad"><b>Rules problems</b><br>${k.issues.slice(0,12).map(esc).join("<br>")}${k.issues.length>12?"<br>…":""}</div>` : `<div class="notice ok">No rules problems for ${esc(FMT[k.fmt].label)}.</div>`}
     <div class="row">
@@ -2035,7 +2033,8 @@ const SKIP_SET_TYPES = new Set(["memorabilia","token","minigame"]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const stripReminder = t => String(t || "").replace(/\n/g, " ").replace(/\s*\([^)]*\)/g, "").trim();
 function toRow(d){
-  if (SKIP_LAYOUTS.has(d.layout) || SKIP_SET_TYPES.has(d.set_type) || !(d.games || []).includes("paper")) return null;
+  const paper = (d.games || []).includes("paper") || ["legal","restricted","banned"].includes(d.legalities?.vintage);
+  if (SKIP_LAYOUTS.has(d.layout) || SKIP_SET_TYPES.has(d.set_type) || !paper) return null;
   const faces = d.card_faces || [d], front = faces[0];
   const type = front.type_line || d.type_line || "";
   const colors = d.colors ?? front.colors ?? [], ident = d.color_identity || [];
@@ -2056,9 +2055,16 @@ function applyOverlay(){
   S.overlayDate = ov.date;
 }
 function reindex(){
-  S.byNorm = new Map();
-  S.cards.forEach((c, i) => { S.byNorm.set(norm(c[0]), i); if (c[0].includes(" // ")) { const f = norm(c[0].split(" // ")[0]); if (!S.byNorm.has(f)) S.byNorm.set(f, i); } });
+  // exact names first; for loose matches ("Rampant Growth" vs the joke card "Rampant, Growth") prefer the card legal in more formats
+  S.byName = new Map(); S.byNorm = new Map();
+  const legalCount = i => { let f = S.cards[i][8] & 31, n = 0; while (f) { n += f & 1; f >>= 1; } return n; };
+  const put = (k, i) => { const j = S.byNorm.get(k); if (j === undefined || legalCount(i) > legalCount(j)) S.byNorm.set(k, i); };
+  S.cards.forEach((c, i) => { S.byName.set(c[0].toLowerCase(), i); put(norm(c[0]), i); });
+  S.cards.forEach((c, i) => { if (c[0].includes(" // ")) { const f = c[0].split(" // ")[0]; if (!S.byName.has(f.toLowerCase())) S.byName.set(f.toLowerCase(), i); if (!S.byNorm.has(norm(f))) S.byNorm.set(norm(f), i); } });
+  const dig = window.MTG_DB?.meta?.digital || [];
+  S.digital = new Set(dig.map(norm));
 }
+const isDigital = n => !!S.digital?.has(norm(String(n).replace(/^A-/, "")));
 async function sfSearch(q, onPage, unique = "cards"){
   let url = "https://api.scryfall.com/cards/search?unique=" + unique + "&q=" + encodeURIComponent(q);
   const out = [];
