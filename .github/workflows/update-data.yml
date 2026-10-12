@@ -28,12 +28,18 @@ jobs:
           curl -fsSL -A "Deckwright/1.0" -o "oracle-cards-$(date -u +%Y%m%d).json" "$URL"
           python3 build_cards.py oracle-cards-*.json cards.js
 
+      - name: Preconstructed decks from MTGJSON
+        continue-on-error: true
+        run: |
+          curl -fsSL -A "Deckwright/1.0" -o AllDeckFiles.tar.gz https://mtgjson.com/api/v5/AllDeckFiles.tar.gz
+          python3 build_precons.py AllDeckFiles.tar.gz precons.json
+
       - name: Save the new data
         run: |
-          rm -f variants.json.gz oracle-cards-*.json
+          rm -f variants.json.gz oracle-cards-*.json AllDeckFiles.tar.gz
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add combos.json cards.js
+          for f in combos.json cards.js precons.json; do if [ -f "$f" ]; then git add "$f"; fi; done
           if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
           git commit -m "Update card and combo data"
           git push
