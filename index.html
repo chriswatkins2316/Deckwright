@@ -119,7 +119,7 @@ label.file strong{font-size:1rem}
 .autocomplete{position:relative}
 .sugg{position:absolute;left:0;right:0;top:100%;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:260px;overflow:auto;box-shadow:0 8px 24px rgb(0 0 0 / .18)}
 .sugg button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-weight:500}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
 nav.tabs button{border:0;border-radius:0;background:transparent;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:.8rem}
 nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
 nav.tabs button[aria-current="page"]{color:var(--accent)}
@@ -144,6 +144,42 @@ details summary{cursor:pointer;font-weight:600}
 .costline{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .costline b{display:block;font:500 1.35rem var(--mono);font-variant-numeric:tabular-nums}
 .price{font-family:var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+nav.tabs button{font-size:.68rem}
+nav.tabs button svg{width:20px;height:20px}
+.saved .conf{grid-column:1/-1}
+.builtbox{min-height:34px}
+.hand{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.hcard{font:inherit;color:var(--fg);text-align:left;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);cursor:pointer;min-width:0;min-height:0}
+.hcard b{font-size:.9rem;overflow-wrap:anywhere}
+.hcard .t{font-size:.75rem;color:var(--muted)}
+.hcard.land{border-style:dashed}
+.hcard.pick{border-color:var(--warn);border-width:2px}
+.hcard img{border-radius:4.6%/3.4%;margin-top:6px}
+.oddsgrid{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:.9rem}
+.oddsgrid b{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.lifegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:360px){.lifegrid{grid-template-columns:1fr}}
+.ptile{border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--bg);min-width:0}
+.ptile.out{opacity:.45}
+.ptile input.pname{font-weight:600;padding:6px 8px;background:var(--surface)}
+.ptile select{padding:6px 8px;font-size:.85rem;background:var(--surface)}
+.lifeRow{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.lifeRow button{min-width:44px;font-size:1.3rem;padding:6px}
+.life{font:500 2.4rem var(--mono);font-variant-numeric:tabular-nums;line-height:1}
+.counter{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:.85rem}
+.counter b{font-family:var(--mono);min-width:1.6em;text-align:center}
+.counter .row{flex-wrap:nowrap;flex:none}
+.counter{flex-wrap:wrap}
+button.mini{min-height:32px;padding:2px 10px}
+.mover{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.mover:last-child{border-bottom:0}
+.mover span:first-child{min-width:0;overflow-wrap:anywhere}
+.spark{width:100%;height:64px;display:block;margin:6px 0}
+.upg{display:flex;flex-direction:column;gap:2px;padding:9px 0;border-bottom:1px solid var(--line)}
+.upg:last-child{border-bottom:0}
+.upg.over{opacity:.55}
+.pick5{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid var(--line)}
+.pick5:last-child{border-bottom:0}
 ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
@@ -185,6 +221,15 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="chips" id="typeFilter"></div>
       <div class="list" id="collList"></div>
       <div class="row" id="collMore"></div>
+    </div>
+    <div class="panel" id="tradePanel" hidden>
+      <h2>Trade and sell</h2>
+      <p class="small muted">Valuable cards you own that aren't needed by any deck you've marked as built.</p>
+      <div class="two">
+        <div class="field"><label class="label" for="tradeMin">Worth at least ($)</label><input type="text" inputmode="decimal" id="tradeMin" value="5"></div>
+        <div class="field"><span class="label">Keep</span><label class="row small" style="min-height:42px"><input type="checkbox" id="tradeKeep" checked> One copy of everything</label></div>
+      </div>
+      <div id="tradeOut"></div>
     </div>
   </section>
 
@@ -233,8 +278,10 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
         <div class="field"><span class="label">Basic lands</span>
           <label class="row small" style="min-height:42px"><input type="checkbox" id="basics" checked> I have plenty of basics</label></div>
       </div>
-      <div class="row"><button class="primary grow" id="buildBtn">Build deck</button></div>
+      <label class="row small"><input type="checkbox" id="freeOnly" checked> Leave cards in my built decks alone</label>
+      <div class="row"><button class="primary grow" id="buildBtn">Build deck</button><button class="grow" id="bestCmdBtn">Find my best commanders</button></div>
       <div id="buildMsg"></div>
+      <div id="bestCmdOut"></div>
     </div>
     <div class="panel" id="progressPanel" hidden>
       <div class="progress"><div class="spin"></div><div class="grow"><b id="stage">Starting</b><div class="stream" id="stream"></div></div><button class="ghost" id="stopBtn">Stop</button></div>
@@ -271,6 +318,27 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <!-- DECKS -->
   <section id="tab-decks" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
     <div class="panel"><h2>Saved decks</h2><div id="savedList"></div></div>
+  </section>
+
+  <!-- PLAY -->
+  <section id="tab-play" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="panel">
+      <h2>Test draws</h2>
+      <div class="field"><label class="label" for="drawDeck">Deck</label><select id="drawDeck"></select></div>
+      <div class="row"><button class="primary grow" id="drawNew">New hand</button><button class="grow" id="drawMull">Mulligan</button><button class="grow" id="drawOne">Draw</button></div>
+      <p class="small muted" id="drawInfo">Pick a deck and tap New hand.</p>
+      <div class="hand" id="drawHand"></div>
+      <div id="drawStats"></div>
+    </div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h2>Life counter</h2>
+        <div class="row"><select id="lifePlayers" style="width:auto" aria-label="Players"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select>
+        <select id="lifeStart" style="width:auto" aria-label="Starting life"><option value="20">20 life</option><option value="40">40 life</option></select></div></div>
+      <div class="lifegrid" id="lifeGrid"></div>
+      <div class="row"><button class="grow" id="lifeReset">New game</button><button class="primary grow" id="lifeWin">Record winner</button></div>
+      <div id="lifeMsg"></div>
+    </div>
+    <div class="panel"><h2>Deck records</h2><div id="records"></div></div>
   </section>
 
   <!-- SETTINGS -->
@@ -314,6 +382,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <button data-tab="build"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.3 6L12 16.4 6.6 19.4l1.3-6L3.4 9.3l6-.7z"/></svg>Build</button>
   <button data-tab="check"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/></svg>Check</button>
   <button data-tab="decks"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6"/></svg>Decks</button>
+  <button data-tab="play"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>Play</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
 </nav>
 
@@ -391,13 +460,14 @@ function parseCSV(text){
   return rows.filter(r => r.some(x => x.trim() !== ""));
 }
 function readImport(text){
-  const out = new Map(), unmatched = new Map(), prints = []; let lines = 0;
+  const out = new Map(), unmatched = new Map(), prints = [], binders = new Map(); let lines = 0;
   const add = (name, qty, pr) => {
     qty = Math.max(0, parseInt(qty,10) || 0); if (!qty || !name) return;
     lines++;
     const i = lookup(name);
     if (i < 0) unmatched.set(name, (unmatched.get(name)||0) + qty);
     else { out.set(i, (out.get(i)||0) + qty); if (pr) prints.push({ ...pr, name:card(i)[C.name], qty }); }
+    return i;
   };
   const first = text.split(/\r?\n/,1)[0] || "";
   if (first.includes(",") && /name/i.test(first)) {
@@ -407,12 +477,20 @@ function readImport(text){
     const col = (...names) => head.findIndex(h => names.includes(h));
     const si = col("set code","set","edition code"), ci = col("collector number","card number","number","cn");
     const fi = col("foil","finish","printing"), idi = col("scryfall id","scryfall_id");
+    const bi = head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) >= 0 ? head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) : col("binder","list","deck","folder");
+    const bti = head.findIndex(h => /binder|list|deck|folder/.test(h) && /type/.test(h));
     for (const r of rows) {
       const f = fi >= 0 ? String(r[fi] || "").trim().toLowerCase() : "";
       const finish = f === "etched" ? "etched" : ["foil","true","yes"].includes(f) ? "foil" : "normal";
       const set = si >= 0 ? String(r[si] || "").trim().toLowerCase() : "", cn = ci >= 0 ? String(r[ci] || "").trim() : "";
       const id = idi >= 0 ? String(r[idi] || "").trim() : "";
-      add(r[ni], qi >= 0 ? r[qi] : 1, (set && cn) || id ? { id, set, cn, finish } : null);
+      const ix = add(r[ni], qi >= 0 ? r[qi] : 1, (set && cn) || id ? { id, set, cn, finish } : null);
+      const bn = bi >= 0 ? String(r[bi] || "").trim() : "";
+      if (bn && ix >= 0) {
+        const b = binders.get(bn) || { type: bti >= 0 ? String(r[bti] || "").trim() : "", cards:new Map() };
+        b.cards.set(ix, (b.cards.get(ix) || 0) + (Math.max(0, parseInt(qi >= 0 ? r[qi] : 1, 10)) || 1));
+        binders.set(bn, b);
+      }
     }
   } else {
     for (const raw of text.split(/\r?\n/)) {
@@ -421,7 +499,7 @@ function readImport(text){
       if (m) add(m[2], m[1]); else add(l, 1);
     }
   }
-  return { out, unmatched, lines, prints };
+  return { out, unmatched, lines, prints, binders };
 }
 function showPreview(res){
   S.pending = res;
@@ -432,6 +510,7 @@ function showPreview(res){
     <div class="notice ${miss.length ? "warn" : "ok"}">Found <b class="num">${total.toLocaleString()}</b> cards (<span class="num">${res.out.size.toLocaleString()}</span> different).
       ${miss.length ? `<br><span class="num">${miss.length}</span> name${miss.length>1?"s":""} didn't match any card and will be skipped.` : ""}</div>
     ${miss.length ? `<details><summary class="small">Show unmatched names</summary><p class="small muted" style="margin-top:6px">${miss.slice(0,80).map(([n,q])=>`${q} ${esc(n)}`).join("<br>")}${miss.length>80?"<br>…":""}</p></details>` : ""}
+    ${binderPick(res)}
     <div class="row">
       <button class="primary grow" id="replaceBtn">${S.coll.size ? "Replace my collection" : "Save as my collection"}</button>
       ${S.coll.size ? `<button class="grow" id="mergeBtn">Add to my collection</button>` : ""}
@@ -443,12 +522,15 @@ function showPreview(res){
 }
 async function applyImport(merge){
   const res = S.pending; if (!res) return;
+  const picked = [...document.querySelectorAll("#importPreview [data-binder]:checked")].map(x => S.pendingBinders[+x.dataset.binder]).filter(Boolean);
   const next = merge ? new Map(S.coll) : new Map();
   for (const [i,q] of res.out) next.set(i, (next.get(i)||0) + q);
   S.prints = mergePrints(merge ? S.prints : [], res.prints || []); savePrints();
   S.coll = next; S.updatedAt = Date.now(); S.pending = null;
   $("#importPreview").innerHTML = `<div class="notice ok">Collection saved.</div>`;
-  setTimeout(() => { $("#importPreview").hidden = true; }, 2500);
+  for (const [name, b] of picked) deckFromCards(name, b.cards, { source:"manabox", built:true });
+  if (picked.length) $("#importPreview").innerHTML = `<div class="notice ok">Collection saved, plus ${picked.length} built deck${picked.length > 1 ? "s" : ""} on the Decks tab.</div>`;
+  setTimeout(() => { $("#importPreview").hidden = true; }, picked.length ? 5000 : 2500);
   renderAll();
   await persistCollection();
 }
@@ -469,6 +551,7 @@ function restoreLocal(){
   S.decks = LS.get("dw.decks") || [];
   S.prints = LS.get("dw.prints") || []; indexPrints();
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
+  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null;
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -520,10 +603,11 @@ async function deleteDeck(id){
 /* ---------- collection view ---------- */
 const TYPES = ["All","Creature","Instant","Sorcery","Artifact","Enchantment","Planeswalker","Land","Commanders"];
 function renderCollection(){
+  S._useAll = useMap();
   const total = [...S.coll.values()].reduce((a,b)=>a+b,0);
   if (!S.coll.size) {
     $("#collStats").innerHTML = ""; $("#colorBreak").innerHTML = ""; $("#typeFilter").innerHTML = ""; $("#collMore").innerHTML = "";
-    $("#collTools").hidden = true; $("#collValue").innerHTML = "";
+    $("#collTools").hidden = true; $("#collValue").innerHTML = ""; $("#tradePanel").hidden = true;
     $("#collList").innerHTML = `<div class="empty"><h3>No cards yet</h3><p class="muted small">Import your ManaBox export above. Your collection is saved on this device. Use Backup in Settings to move it to another one.</p></div>`;
     return;
   }
@@ -544,10 +628,11 @@ function renderCollection(){
     return true;
   }).sort(S.filter.sort === "value" ? (a,b) => ownedValue(b[0]) - ownedValue(a[0]) : (a,b) => card(a[0])[C.name].localeCompare(card(b[0])[C.name]));
   const shown = rows.slice(0, S.shown);
-  $("#collList").innerHTML = shown.length ? shown.map(([i,qty]) => cardRow(i, qty, "", ownedValue(i))).join("") : `<p class="muted small">No cards match.</p>`;
+  $("#collList").innerHTML = shown.length ? shown.map(([i,qty]) => { const u = S._useAll.get(card(i)[C.name])?.q || 0; return cardRow(i, qty, u ? `${u} in built decks` : "", ownedValue(i)); }).join("") : `<p class="muted small">No cards match.</p>`;
   bindCardRows($("#collList"));
   $("#collMore").innerHTML = rows.length > S.shown ? `<button id="moreBtn" class="grow">Show more (${(rows.length - S.shown).toLocaleString()} left)</button>` : `<span class="small muted">${rows.length.toLocaleString()} shown</span>`;
   if ($("#moreBtn")) $("#moreBtn").onclick = () => { S.shown += 200; renderCollection(); };
+  renderTrade();
 }
 function cardRow(i, qty, role, price){
   const c = card(i);
@@ -572,6 +657,7 @@ let searchT; $("#collSearch").addEventListener("input", e => { clearTimeout(sear
 function renderBuildForm(){
   const fmt = $("#fmt").value;
   $("#cmdField").hidden = fmt !== "commander";
+  $("#bestCmdBtn").hidden = fmt !== "commander";
   $("#colorField").hidden = fmt === "commander";
   $("#colorPick").innerHTML = COLORS.map(x => `<button class="pipbtn ${x}" data-c="${x}" aria-pressed="${S.colorPick.has(x)}" aria-label="${CNAME[x]}">${x}</button>`).join("");
   $("#colorPick").querySelectorAll("button").forEach(b => b.onclick = () => { const x = b.dataset.c; S.colorPick.has(x) ? S.colorPick.delete(x) : S.colorPick.add(x); renderBuildForm(); });
@@ -600,8 +686,11 @@ function lineFor(i, qty){
 function makePool(o){
   const words = themeWords(o.theme), allowed = o.identity;
   const list = [];
-  for (const [i,q] of S.coll) {
+  const inUse = usedFor(o);
+  for (const [i,q0] of S.coll) {
     const c = card(i);
+    const q = q0 - (inUse.get(c[C.name])?.q || 0);
+    if (q <= 0) continue;
     if (!legalIn(c, o.fmt)) continue;
     if (o.commander != null && i === o.commander) continue;
     if (allowed && ![...c[C.id]].every(x => allowed.includes(x))) continue;
@@ -657,10 +746,10 @@ function validate(spec, o){
   }
   const okCards = [];
   for (const [i, v] of merged) {
-    const c = card(i), owned = S.coll.get(i) || 0, name = c[C.name];
+    const c = card(i), name = c[C.name], owned = Math.max(0, (S.coll.get(i) || 0) - (usedFor(o).get(name)?.q || 0));
     if (o.commander === i) { problems.push(`${name} is the commander; don't list it in cards.`); continue; }
     if (o.basicsUnlimited && isBasic(c)) { basics[name] = (basics[name]||0) + v.qty; continue; }
-    if (!owned) { problems.push(`${name}: not in the collection.`); continue; }
+    if (!owned) { problems.push(`${name}: ${S.coll.get(i) ? "every copy you own is in a built deck" : "not in the collection"}.`); continue; }
     if (!legalIn(c, o.fmt)) { problems.push(`${name}: not legal in ${f.label}.`); continue; }
     if (o.identity !== undefined && o.fmt === "commander" && ![...c[C.id]].every(x => (o.identity||"").includes(x))) { problems.push(`${name}: outside the commander's colour identity.`); continue; }
     let qty = v.qty;
@@ -751,14 +840,14 @@ function toDeck(o, res, prevId){
   return { id: prevId || Math.random().toString(36).slice(2,10), name: String(spec.name || "Untitled deck").slice(0,80), summary: String(spec.summary || ""), gameplan: String(spec.gameplan || ""),
     format:o.fmt, commander: o.commander != null ? card(o.commander)[C.name] : null, identity:o.identity || "",
     cards: v.okCards.map(e => ({ name:e.name, qty:e.qty, role:e.role })), basics: v.basics, warnings, total,
-    opts:{ fmt:o.fmt, power:o.power, theme:o.theme, depth:o.depth, basicsUnlimited:o.basicsUnlimited, colors:o.colors || "" }, createdAt: Date.now(), saved:false };
+    opts:{ fmt:o.fmt, power:o.power, theme:o.theme, depth:o.depth, basicsUnlimited:o.basicsUnlimited, colors:o.colors || "", freeOnly:!!o.freeOnly }, createdAt: Date.now(), saved:false };
 }
 
 async function build(){
   $("#buildMsg").innerHTML = "";
   if (!S.coll.size) return alertMsg("#buildMsg", "Import your collection first, on the Collection tab.");
   if (!S.sample) return showKeyNeeded("#buildMsg");
-  const o = { fmt:$("#fmt").value, power:$("#power").value, theme:$("#theme").value.trim(), depth:$("#depth").value, basicsUnlimited:$("#basics").checked };
+  const o = { fmt:$("#fmt").value, power:$("#power").value, theme:$("#theme").value.trim(), depth:$("#depth").value, basicsUnlimited:$("#basics").checked, freeOnly:$("#freeOnly").checked };
   S.ctl = new AbortController(); busy(true); $("#deckView").innerHTML = "";
   try {
     if (o.fmt === "commander") {
@@ -791,7 +880,7 @@ $("#buildBtn").onclick = build;
 
 async function tweak(request){
   const d = S.current; if (!d || !S.sample) return;
-  const o = { ...d.opts, commander: d.commander ? lookup(d.commander) : null, identity: d.commander ? d.identity : (d.opts.colors || undefined) };
+  const o = { ...d.opts, excludeId:d.id, commander: d.commander ? lookup(d.commander) : null, identity: d.commander ? d.identity : (d.opts.colors || undefined) };
   const list = [...(d.commander ? [`COMMANDER: ${d.commander}`] : []), ...d.cards.map(c => `${c.qty} ${c.name}`), ...Object.entries(d.basics).map(([n,q]) => `${q} ${n} (basic)`)].join("\n");
   const extra = `- This is a revision. CURRENT DECK:\n${list}\n- CHANGE REQUESTED: ${request}\n- Keep what works; change only what the request needs, and keep the deck at full size.`;
   S.ctl = new AbortController(); busy(true);
@@ -799,7 +888,7 @@ async function tweak(request){
   try {
     const res = await runDeckCall(o, extra);
     const nd = toDeck(o, res, d.saved ? d.id : null);
-    nd.saved = false; S.current = nd; renderDeck();
+    nd.saved = false; nd.built = !!d.built; S.current = nd; renderDeck();
     if (d.saved) await saveDeck(nd);
   } catch (e) {
     if (e?.code !== "cancelled") { const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
@@ -832,7 +921,7 @@ function renderDeck(){
   const order = [...GROUPS.map(g => g[0]), "Other"];
   const cmdIdx = d.commander ? lookup(d.commander) : -1;
   view.innerHTML = `<div class="panel">
-    <div class="decktop"><div class="grow"><span class="label">${esc(f.label)}${d.commander ? "" : d.identity ? " · " + d.identity : ""}</span><h2>${esc(d.name)}</h2></div>
+    <div class="decktop"><div class="grow"><span class="label">${esc(f.label)}${d.commander ? "" : d.identity ? " · " + d.identity : ""}</span><h2 id="deckName">${esc(d.name)}</h2><button class="ghost" id="renameBtn" style="min-height:30px;padding:3px 10px;font-size:.8rem">Rename</button></div>
       <span class="count ${total >= f.size ? "ok" : "short"}">${total}/${f.size}</span></div>
     ${cmdIdx >= 0 ? `<div class="list">${cardRow(cmdIdx, 1, "commander")}</div>` : ""}
     ${d.summary ? `<p>${esc(d.summary)}</p>` : ""}
@@ -843,6 +932,8 @@ function renderDeck(){
       <button class="primary grow" id="saveDeckBtn">${d.saved ? "Saved" : "Save deck"}</button>
       <button class="grow" id="copyBtn">Copy list</button>
     </div>
+    <label class="row small builtbox"><input type="checkbox" id="deckBuilt" ${d.built ? "checked" : ""}> I've built this deck, so its cards are in use${d.saved ? recordText(d.id) : ""}</label>
+    <div id="deckConflicts" class="small">${conflictHTML(d)}</div>
     <textarea id="copyArea" hidden readonly></textarea>
   </div>
   <div class="panel">
@@ -862,8 +953,17 @@ function renderDeck(){
     <div class="chips">${["More removal","Lower the curve","More card draw","Tighten the mana base","Make it stronger"].map(t => `<button class="chip" data-tweak="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="row"><input type="text" id="tweakInput" class="grow" placeholder="Swap the artifacts for more dragons" style="flex:1"><button id="tweakBtn" data-tweak="">Ask</button></div>
     <div id="tweakMsg"></div>
+  </div>
+  <div class="panel">
+    <h3>Upgrade on a budget</h3>
+    <p class="small muted">Claude suggests cards to buy and what each replaces, then real Scryfall prices trim the list to your budget.</p>
+    <div class="row"><label for="budgetIn" class="label" style="margin:0">Budget $</label><input type="text" inputmode="decimal" id="budgetIn" value="${esc(d.lastBudget || "20")}" style="width:6.5em;flex:none"><button class="primary grow" id="budgetBtn">Suggest upgrades</button></div>
+    <div id="budgetOut"></div>
   </div>`;
   bindCardRows(view);
+  $("#deckBuilt").onchange = e => setBuilt(d, e.target.checked);
+  $("#renameBtn").onclick = () => renameDeck(d);
+  $("#budgetBtn").onclick = () => budgetUpgrade(d);
   $("#saveDeckBtn").onclick = async () => { await saveDeck(S.current); $("#saveDeckBtn").textContent = "Saved"; };
   $("#copyBtn").onclick = () => {
     const t = deckText(d);
@@ -969,6 +1069,7 @@ function renderCheck(){
     ${k.issues.length ? `<div class="notice bad"><b>Rules problems</b><br>${k.issues.slice(0,12).map(esc).join("<br>")}${k.issues.length>12?"<br>…":""}</div>` : `<div class="notice ok">No rules problems for ${esc(FMT[k.fmt].label)}.</div>`}
     <div class="row">
       ${missing.length ? `<button class="grow" id="copyNeedBtn">Copy shopping list</button>` : ""}
+      <button class="grow" id="saveCheckBtn">Save as deck</button>
       <button class="primary grow" id="evalBtn">${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
     <textarea id="needArea" hidden readonly></textarea>
@@ -990,6 +1091,7 @@ function renderCheck(){
       .catch(() => { const a = $("#needArea"); a.hidden = false; a.value = t; a.style.minHeight = "140px"; a.focus(); a.select(); });
   };
   $("#evalBtn").onclick = evaluateDeck;
+  $("#saveCheckBtn").onclick = saveCheckAsDeck;
   if (!S.sample) $("#evalBtn").onclick = () => showKeyNeeded("#evalMsg");
   if ($("#useSubsBtn")) $("#useSubsBtn").onclick = buildFromCheck;
 }
@@ -1110,13 +1212,484 @@ function renderSaved(){
   if (!S.decks.length) { box.innerHTML = `<div class="empty"><h3>No saved decks</h3><p class="small muted">Build one on the Build tab and tap Save deck. They're stored on this device.</p></div>`; return; }
   box.innerHTML = S.decks.map(d => `<div class="saved"><button class="open" data-id="${d.id}">${esc(d.name)}</button><span class="count num ${d.total >= FMT[d.format].size ? "ok":"short"}">${d.total}/${FMT[d.format].size}</span>
     <span class="small muted">${esc(FMT[d.format].label)}${d.commander ? " · " + esc(d.commander) : ""} · ${new Date(d.createdAt).toLocaleDateString()}</span>
-    <span class="row" style="justify-content:flex-end"><button class="ghost danger small" data-del="${d.id}">Delete</button></span></div>`).join("");
+    <span class="row" style="justify-content:flex-end"><button class="ghost danger small" data-del="${d.id}">Delete</button></span>
+    <label class="row small builtbox"><input type="checkbox" data-built="${d.id}" ${d.built ? "checked" : ""}> Built${recordText(d.id)}</label><span></span>
+    <div class="small conf">${conflictHTML(d, true)}</div></div>`).join("");
+  box.querySelectorAll("[data-built]").forEach(cb => cb.onchange = () => { const d = S.decks.find(x => x.id === cb.dataset.built); if (d) setBuilt(d, cb.checked); });
   box.querySelectorAll("button.open").forEach(b => b.onclick = () => { S.current = S.decks.find(x => x.id === b.dataset.id); showTab("build"); renderDeck(); $("#deckView").scrollIntoView({ behavior:"smooth" }); });
   box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
     if (b.dataset.confirm) { deleteDeck(b.dataset.del); return; }
     b.dataset.confirm = "1"; b.textContent = "Tap again to delete";
     setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Delete"; } }, 3000);
   });
+}
+
+/* ---------- built decks and card availability ---------- */
+function useMap(exceptId){
+  const m = new Map();
+  for (const d of S.decks || []) {
+    if (!d.built || d.id === exceptId) continue;
+    const add = (n, q) => { const e = m.get(n) || { q:0, decks:[] }; e.q += q; if (!e.decks.includes(d.name)) e.decks.push(d.name); m.set(n, e); };
+    if (d.commander) add(d.commander, 1);
+    for (const c of d.cards || []) add(c.name, c.qty);
+  }
+  return m;
+}
+function usedFor(o){ if (!o._used) o._used = o.freeOnly ? useMap(o.excludeId) : new Map(); return o._used; }
+function deckEntries(d){ return [...(d.commander ? [[d.commander, 1]] : []), ...(d.cards || []).map(c => [c.name, c.qty])]; }
+function shortfalls(d){
+  const used = useMap(d.id), out = [];
+  for (const [n, q] of deckEntries(d)) {
+    const i = lookup(n); if (i < 0 || isBasic(card(i))) continue;
+    const own = S.coll.get(i) || 0, u = used.get(n), free = own - (u?.q || 0);
+    if (q > free) out.push({ n, q, own, free:Math.max(0, free), decks:u?.decks || [] });
+  }
+  return out;
+}
+function conflictHTML(d, compact){
+  if (!S.coll.size) return "";
+  const s = shortfalls(d), shared = s.filter(x => x.decks.length), missing = s.filter(x => !x.decks.length);
+  const parts = [];
+  if (shared.length) parts.push(`<div class="notice warn">${d.built ? "Not enough copies for all your built decks" : "Building this would take cards from your built decks"}: ${shared.slice(0, compact ? 4 : 12).map(x => `${esc(x.n)} (need ${x.q}, ${x.free} free; in ${esc(x.decks.join(", "))})`).join("; ")}${shared.length > (compact ? 4 : 12) ? "; …" : ""}</div>`);
+  if (missing.length && (d.built || !compact)) parts.push(`<div class="notice">${d.built ? "Missing from your collection" : "You don't own"}: ${missing.slice(0, compact ? 4 : 12).map(x => esc(x.n) + (x.q - x.own > 1 ? ` ×${x.q - x.own}` : "")).join(", ")}${missing.length > (compact ? 4 : 12) ? ", …" : ""}</div>`);
+  return parts.join("");
+}
+async function setBuilt(d, on){
+  d.built = on;
+  await saveDeck(d);
+  if (S.current && S.current.id === d.id) renderDeck();
+  renderCollection();
+}
+function renameDeck(d){
+  const h = $("#deckName"); if (!h) return;
+  h.outerHTML = `<div class="row" id="deckName"><input type="text" id="renameIn" value="${esc(d.name)}" style="flex:1"><button class="primary" id="renameOk">Save</button></div>`;
+  $("#renameBtn").hidden = true;
+  const done = async () => { const v = $("#renameIn").value.trim(); if (v) d.name = v.slice(0, 80); if (d.saved) await saveDeck(d); renderDeck(); };
+  $("#renameOk").onclick = done;
+  $("#renameIn").onkeydown = e => { if (e.key === "Enter") done(); };
+  $("#renameIn").focus();
+}
+function deckFromCards(name, cmap, opts = {}){
+  const entries = [...cmap].filter(([i]) => i >= 0);
+  const total = entries.reduce((a, [, q]) => a + q, 0);
+  let fmt = opts.fmt, cmd = opts.cmd ?? null;
+  if (!fmt) {
+    const singleton = entries.every(([i, q]) => q === 1 || isBasic(card(i)));
+    fmt = singleton && total >= 98 && total <= 101 ? "commander" : "casual";
+    if (fmt === "commander") {
+      const ids = new Set(); for (const [i] of entries) for (const x of card(i)[C.id]) ids.add(x);
+      const cands = entries.map(([i]) => i).filter(i => canCommand(card(i)));
+      cmd = cands.find(i => [...ids].every(x => card(i)[C.id].includes(x))) ?? cands[0] ?? null;
+    }
+  }
+  const basics = {}, cards = [];
+  for (const [i, q] of entries) {
+    if (i === cmd) { if (q > 1) cards.push({ name:card(i)[C.name], qty:q - 1, role:"" }); continue; }
+    const c = card(i);
+    if (isBasic(c)) basics[c[C.name]] = (basics[c[C.name]] || 0) + q; else cards.push({ name:c[C.name], qty:q, role:"" });
+  }
+  const existing = opts.source === "manabox" ? S.decks.find(x => x.source === "manabox" && x.name === name) : null;
+  const d = { id: existing?.id || Math.random().toString(36).slice(2, 10), name, summary: existing?.summary || "", gameplan: existing?.gameplan || "",
+    format:fmt, commander: cmd != null ? card(cmd)[C.name] : null, identity: cmd != null ? card(cmd)[C.id] : "",
+    cards, basics, warnings:[], total,
+    opts:{ fmt, power:"focused", theme:"", depth:"default", basicsUnlimited:true, colors:"", freeOnly:true },
+    createdAt: existing?.createdAt || Date.now(), saved:true, built: existing ? existing.built : !!opts.built, source: opts.source || "" };
+  S.decks = [d, ...S.decks.filter(x => x.id !== d.id)];
+  LS.set("dw.decks", S.decks);
+  return d;
+}
+function binderPick(res){
+  S.pendingBinders = [...(res.binders || new Map())];
+  if (!S.pendingBinders.length) return "";
+  const looksDeck = (n, b) => /deck/i.test(b.type) || /deck/i.test(n) || [...b.cards.values()].reduce((a, q) => a + q, 0) >= 40;
+  return `<div class="notice"><b>Your file has ${S.pendingBinders.length} binder${S.pendingBinders.length > 1 ? "s or lists" : " or list"}.</b> Tick the ones that are real, sleeved-up decks and they'll be saved as built decks.
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">${S.pendingBinders.map(([n, b], k) => `<label class="row small"><input type="checkbox" data-binder="${k}" ${looksDeck(n, b) && !/trade|bulk|binder|collection|sell/i.test(n) ? "checked" : ""}> ${esc(n)} <span class="muted">(${[...b.cards.values()].reduce((a, q) => a + q, 0)} cards${b.type ? ", " + esc(b.type) : ""})</span></label>`).join("")}</div></div>`;
+}
+function saveCheckAsDeck(){
+  const k = S.check; if (!k) return;
+  const cmap = new Map();
+  for (const r of k.rows) cmap.set(r.i, (cmap.get(r.i) || 0) + r.need);
+  const cmd = k.fmt === "commander" && k.commanders.length ? k.commanders[0] : null;
+  const name = cmd != null ? card(cmd)[C.name].split(",")[0] + " deck" : "Deck from " + new Date().toLocaleDateString();
+  const d = deckFromCards(name, cmap, { fmt:k.fmt, cmd, source:"check", built:false });
+  d.summary = k.evalResult?.verdict || ""; LS.set("dw.decks", S.decks);
+  renderSaved();
+  $("#evalMsg").innerHTML = `<div class="notice ok">Saved as "${esc(d.name)}" on the Decks tab. Tick Built there once you've put it together.</div>`;
+}
+
+/* ---------- trade and sell ---------- */
+function renderTrade(){
+  const box = $("#tradeOut"); if (!box) return;
+  if (!S.coll.size) { $("#tradePanel").hidden = true; return; }
+  $("#tradePanel").hidden = false;
+  const min = parseFloat(String($("#tradeMin").value).replace(/[^0-9.]/g, "")) || 0, keep = $("#tradeKeep").checked;
+  const used = S._useAll || useMap(), rows = [];
+  for (const [i, q] of S.coll) {
+    const c = card(i); if (isBasic(c)) continue;
+    const unit = unitOwned(i); if (unit < min || unit <= 0) continue;
+    const spare = q - Math.max(used.get(c[C.name])?.q || 0, keep ? 1 : 0);
+    if (spare > 0) rows.push({ i, n:spare, unit });
+  }
+  rows.sort((a, b) => b.unit - a.unit);
+  const total = rows.reduce((a, r) => a + r.n * r.unit, 0), count = rows.reduce((a, r) => a + r.n, 0);
+  box.innerHTML = rows.length
+    ? `<p><b class="price">${money(total)}</b> <span class="muted">in ${count} card${count > 1 ? "s" : ""}</span></p>
+       <div class="list">${rows.slice(0, 150).map(r => cardRow(r.i, r.n, "", r.n * r.unit)).join("")}</div>
+       ${rows.length > 150 ? `<p class="small muted">Showing the 150 most valuable. Copy list includes all ${rows.length}.</p>` : ""}
+       <div class="row"><button class="grow" id="tradeCopy">Copy list</button></div><textarea id="tradeArea" hidden readonly></textarea>`
+    : `<p class="small muted">Nothing worth ${money(min)} or more is spare right now.</p>`;
+  bindCardRows(box);
+  if ($("#tradeCopy")) $("#tradeCopy").onclick = () => {
+    const t = rows.map(r => `${r.n} ${card(r.i)[C.name]}`).join("\n");
+    navigator.clipboard?.writeText(t).then(() => { $("#tradeCopy").textContent = "Copied"; })
+      .catch(() => { const a = $("#tradeArea"); a.hidden = false; a.value = t; a.style.minHeight = "140px"; a.focus(); a.select(); });
+  };
+}
+let tradeT; $("#tradeMin").addEventListener("input", () => { clearTimeout(tradeT); tradeT = setTimeout(renderTrade, 300); });
+$("#tradeKeep").onchange = renderTrade;
+
+/* ---------- price history ---------- */
+function snapshotPrices(){
+  const h = S.history || { totals:[], prev:null, last:null };
+  const date = S.livePrices.date, cards = {};
+  for (const i of S.coll.keys()) cards[card(i)[C.name]] = Math.round(unitOwned(i) * 100) / 100;
+  if (h.last && h.last.date !== date) h.prev = h.last;
+  h.last = { date, cards };
+  h.totals = (h.totals || []).filter(t => t[0] !== date);
+  h.totals.push([date, Math.round(collectionValue() * 100) / 100]);
+  h.totals = h.totals.slice(-90);
+  S.history = h; LS.set("dw.history", h);
+  renderValue();
+}
+function historyHTML(){
+  const h = S.history;
+  if (!h || !h.totals?.length) return "";
+  if (h.totals.length < 2) return `<p class="small muted">Refresh prices again on another day to see how your collection's value changes.</p>`;
+  const t = h.totals, a = t[t.length - 2], b = t[t.length - 1], diff = b[1] - a[1];
+  const vals = t.map(x => x[1]), lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const pts = t.map((x, k) => `${(k / (t.length - 1) * 296 + 2).toFixed(1)},${(58 - (x[1] - lo) / span * 54).toFixed(1)}`).join(" ");
+  const movers = [];
+  if (h.prev && h.last) for (const [n, now] of Object.entries(h.last.cards)) {
+    const was = h.prev.cards[n]; if (was == null) continue;
+    const i = lookup(n), q = i >= 0 ? (S.coll.get(i) || 0) : 0, d = (now - was) * q;
+    if (Math.abs(d) >= 0.01) movers.push({ n, was, now, d });
+  }
+  const ups = movers.filter(m => m.d > 0).sort((x, y) => y.d - x.d).slice(0, 5), downs = movers.filter(m => m.d < 0).sort((x, y) => x.d - y.d).slice(0, 5);
+  const mv = (m, cls) => `<div class="mover"><span>${esc(m.n)} <span class="muted small">${money(m.was)} → ${money(m.now)}</span></span><span class="price ${cls}">${m.d > 0 ? "+" : "−"}${money(Math.abs(m.d))}</span></div>`;
+  return `<details style="margin-top:8px"><summary>${diff >= 0 ? "Up" : "Down"} <span class="price ${diff >= 0 ? "have" : "need"}">${diff >= 0 ? "+" : "−"}${money(Math.abs(diff))}</span> since ${esc(a[0])}</summary>
+    <svg class="spark" viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label="Collection value over ${t.length} price refreshes, from ${money(t[0][1])} to ${money(b[1])}"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <div class="row small muted" style="justify-content:space-between"><span>${esc(t[0][0])} · ${money(t[0][1])}</span><span>${esc(b[0])} · ${money(b[1])}</span></div>
+    ${ups.length ? `<p class="label" style="margin-top:10px">Biggest gains since ${esc(h.prev.date)}</p><div>${ups.map(m => mv(m, "have")).join("")}</div>` : ""}
+    ${downs.length ? `<p class="label" style="margin-top:10px">Biggest drops since ${esc(h.prev.date)}</p><div>${downs.map(m => mv(m, "need")).join("")}</div>` : ""}
+  </details>`;
+}
+
+/* ---------- budget upgrades ---------- */
+async function budgetUpgrade(d){
+  const out = $("#budgetOut");
+  const budget = parseFloat(String($("#budgetIn").value).replace(/[^0-9.]/g, "")) || 0;
+  if (!S.sample) return showKeyNeeded("#budgetOut");
+  if (budget <= 0) { out.innerHTML = `<div class="notice warn">Enter a budget in dollars.</div>`; return; }
+  d.lastBudget = String(budget);
+  const f = FMT[d.format], inDeck = new Set(deckEntries(d).map(([n]) => n));
+  const lines = deckEntries(d).map(([n, q]) => { const i = lookup(n); return `${q} ${n}${i >= 0 ? " ~" + money(basePrice(i, "normal")) : ""}`; });
+  const prompt = `You are an expert Magic: The Gathering deckbuilder. Suggest cards for the player to BUY to upgrade this ${f.label} deck, with a total budget of $${budget} USD at TCGplayer market prices.
+${d.commander ? `COMMANDER: ${d.commander} (colour identity ${d.identity || "colorless"})\n` : ""}${d.summary ? `DECK PLAN: ${d.summary}\n` : ""}
+RULES
+- Every card you add must be legal in ${f.label}${d.commander ? " and inside the commander's colour identity" : ""}, and must not already be in the deck.
+- Each upgrade replaces one specific card currently in the deck${d.format === "commander" ? " (qty is always 1)" : "; qty is how many copies to swap"}. Don't replace basic lands unless the upgrade is a land.
+- Order upgrades from most to least impactful. Suggest roughly 30% more than the budget covers, each with your best estimate of the price of one cheap printing, so the app can trim to real prices.
+- Favour efficient, high-impact cards and synergy with the deck's plan over expensive splashy ones.
+
+Reply with only JSON: {"upgrades":[{"add":"Card Name","qty":1,"replaces":"Card In Deck","est_price":2.5,"why":"short reason"}]}
+
+DECK (qty name ~typical price):
+${lines.join("\n")}`;
+  const ctl = new AbortController();
+  out.innerHTML = `<div class="progress" style="margin-top:8px"><div class="spin"></div><div class="grow"><b>Claude is picking upgrades</b><div class="stream" id="budgetStream"></div></div><button class="ghost" id="budgetStop">Stop</button></div>`;
+  $("#budgetStop").onclick = () => ctl.abort();
+  $("#budgetBtn").disabled = true;
+  try {
+    const r = await S.sample.json(prompt, { modelTier:"default", signal:ctl.signal, cache:false, onText:({ text }) => { const s = $("#budgetStream"); if (s) s.textContent = text.slice(-160); } });
+    const seen = new Set(), items = [];
+    for (const u of Array.isArray(r?.upgrades) ? r.upgrades : []) {
+      const ai = lookup(u?.add), ri = lookup(u?.replaces); if (ai < 0) continue;
+      const add = card(ai)[C.name], rep = ri >= 0 ? card(ri)[C.name] : null;
+      if (inDeck.has(add) || seen.has(add) || !legalIn(card(ai), d.format)) continue;
+      if (d.commander && ![...card(ai)[C.id]].every(x => (d.identity || "").includes(x))) continue;
+      if (!rep || !inDeck.has(rep)) continue;
+      seen.add(add);
+      items.push({ ai, add, rep, qty: d.format === "commander" ? 1 : Math.max(1, Math.min(4, parseInt(u.qty, 10) || 1)), why:String(u.why || "") });
+    }
+    if (!items.length) { out.innerHTML = `<div class="notice warn">Claude didn't come back with usable upgrades. Try again or change the budget.</div>`; return; }
+    $("#budgetStream") && ($("#budgetStream").textContent = "Getting current prices…");
+    let live = true;
+    try { await cheapestPrices(items.map(x => x.add)); } catch { live = false; }
+    const used = useMap(d.id);
+    let spent = 0;
+    for (const x of items) {
+      const free = (S.coll.get(x.ai) || 0) - (used.get(x.add)?.q || 0);
+      x.owned = free >= x.qty;
+      x.cost = x.owned ? 0 : x.qty * buyPrice(x.ai);
+      x.fits = spent + x.cost <= budget + 0.005;
+      if (x.fits) spent += x.cost;
+    }
+    S.upgrades = { deckId:d.id, items, budget, spent };
+    const fit = items.filter(x => x.fits), over = items.filter(x => !x.fits);
+    const row = x => `<div class="upg ${x.fits ? "" : "over"}"><span><b>${x.qty > 1 ? x.qty + "× " : ""}${esc(x.add)}</b> <span class="muted">replaces ${esc(x.rep)}</span></span>
+      <span class="small">${x.owned ? `<span class="have">You already own it</span>` : `<span class="price">${money(x.cost)}</span>`}${x.why ? ` · <span class="muted">${esc(x.why)}</span>` : ""}</span></div>`;
+    out.innerHTML = `<p style="margin-top:10px"><b class="price">${money(spent)}</b> <span class="muted">of ${money(budget)} · ${fit.length} upgrade${fit.length === 1 ? "" : "s"}${live ? "" : " · typical prices (Scryfall unreachable)"}</span></p>
+      <div>${fit.map(row).join("")}</div>
+      ${over.length ? `<details><summary class="small">Over budget (${over.length})</summary><div>${over.map(row).join("")}</div></details>` : ""}
+      <div class="row" style="margin-top:8px">${fit.some(x => !x.owned) ? `<button class="grow" id="upgCopy">Copy shopping list</button>` : ""}<button class="primary grow" id="upgApply">Apply to deck</button></div>
+      <textarea id="upgArea" hidden readonly></textarea>`;
+    if ($("#upgCopy")) $("#upgCopy").onclick = () => {
+      const t = fit.filter(x => !x.owned).map(x => `${x.qty} ${x.add}`).join("\n");
+      navigator.clipboard?.writeText(t).then(() => { $("#upgCopy").textContent = "Copied"; })
+        .catch(() => { const a = $("#upgArea"); a.hidden = false; a.value = t; a.style.minHeight = "120px"; a.focus(); a.select(); });
+    };
+    $("#upgApply").onclick = async () => {
+      for (const x of fit) {
+        const r0 = d.cards.find(c => c.name === x.rep); if (r0) r0.qty -= x.qty;
+        else if (d.basics[x.rep]) d.basics[x.rep] = Math.max(0, d.basics[x.rep] - x.qty);
+        const ex = d.cards.find(c => c.name === x.add);
+        if (ex) ex.qty += x.qty; else d.cards.push({ name:x.add, qty:x.qty, role:"upgrade" });
+      }
+      d.cards = d.cards.filter(c => c.qty > 0);
+      d.total = d.cards.reduce((a, c) => a + c.qty, 0) + Object.values(d.basics).reduce((a, b) => a + b, 0) + (d.commander ? 1 : 0);
+      S.current = d;
+      if (d.saved) await saveDeck(d);
+      renderDeck();
+      $("#tweakMsg").innerHTML = `<div class="notice ok">Applied ${fit.length} upgrade${fit.length === 1 ? "" : "s"}. New cards are marked "upgrade".</div>`;
+    };
+  } catch (e) {
+    out.innerHTML = e?.code === "cancelled" ? "" : `<div class="notice bad">${esc(errText(e))}</div>`;
+  } finally { if ($("#budgetBtn")) $("#budgetBtn").disabled = false; }
+}
+
+/* ---------- best commanders ---------- */
+async function bestCommanders(){
+  const out = $("#bestCmdOut");
+  if (!S.coll.size) { out.innerHTML = `<div class="notice warn">Import your collection first.</div>`; return; }
+  if (!S.sample) return showKeyNeeded("#bestCmdOut");
+  const used = $("#freeOnly").checked ? useMap() : new Map();
+  const free = i => (S.coll.get(i) || 0) - (used.get(card(i)[C.name])?.q || 0);
+  const pool = [...S.coll.keys()].filter(i => free(i) > 0 && legalIn(card(i), "commander"));
+  const cands = pool.filter(i => canCommand(card(i)));
+  if (!cands.length) { out.innerHTML = `<div class="notice warn">You don't have a free legendary creature that can lead a Commander deck.</div>`; return; }
+  const fits = (i, id) => [...card(i)[C.id]].every(x => id.includes(x));
+  const info = cands.map(i => {
+    const id = card(i)[C.id], words = themeWords(card(i)[C.text] + " " + (card(i)[C.type].split("—")[1] || ""));
+    const members = pool.filter(j => j !== i && fits(j, id));
+    const spells = members.filter(j => !isLand(card(j))), lands = members.filter(j => isLand(card(j)));
+    const syn = spells.map(j => ({ j, s:score(card(j), words) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 10);
+    return { i, spells:spells.length, lands:lands.length, syn, rank: spells.length + syn.reduce((a, x) => a + x.s, 0) };
+  }).sort((a, b) => b.rank - a.rank).slice(0, 30);
+  const prompt = `You are an expert Commander (EDH) deckbuilder. The player owns these legendary creatures and wants to know which would make the best deck from the cards they ALREADY OWN. For each candidate you get its text, how many nonland cards and lands they own within its colour identity, and their owned cards that best match its theme.
+
+Pick the 5 best. Weigh how complete and strong a deck their current collection supports, not just how strong the commander is in general. For each give: a 1-10 rating of the deck they could build today, a one-sentence why, up to 5 key cards they own for it (exact names from the lists), and up to 6 cards they don't own that would improve it most (prefer affordable staples).
+
+Reply with only JSON: {"picks":[{"commander":"Exact Name","rating":7,"why":"…","key_owned":["…"],"buy":["…"]}]}
+
+CANDIDATES
+${info.map(x => { const c = card(x.i); return `## ${c[0]} | ${c[1]} | ${c[3]} | identity ${c[5] || "colorless"} | ${c[6].slice(0, 260)}
+owned in identity: ${x.spells} nonland, ${x.lands} lands
+best matches: ${x.syn.map(s => card(s.j)[C.name]).join("; ") || "none"}`; }).join("\n")}`;
+  const ctl = new AbortController();
+  out.innerHTML = `<div class="progress" style="margin-top:8px"><div class="spin"></div><div class="grow"><b>Claude is comparing ${info.length} commanders</b><div class="stream" id="bestStream"></div></div><button class="ghost" id="bestStop">Stop</button></div>`;
+  $("#bestStop").onclick = () => ctl.abort();
+  $("#bestCmdBtn").disabled = true;
+  try {
+    const r = await S.sample.json(prompt, { modelTier:$("#depth").value, signal:ctl.signal, cache:false, onText:({ text }) => { const s = $("#bestStream"); if (s) s.textContent = text.slice(-160); } });
+    const picks = [];
+    for (const p of Array.isArray(r?.picks) ? r.picks : []) {
+      const i = lookup(p?.commander); if (i < 0 || !cands.includes(i) || picks.some(x => x.i === i)) continue;
+      const id = card(i)[C.id];
+      const buy = [...new Set((p.buy || []).map(n => lookup(n)).filter(j => j >= 0 && !(S.coll.get(j) > 0) && legalIn(card(j), "commander") && fits(j, id)))];
+      const key = (p.key_owned || []).map(n => lookup(n)).filter(j => j >= 0 && S.coll.has(j));
+      picks.push({ i, rating:Math.max(1, Math.min(10, Math.round(+p.rating || 0))) || "?", why:String(p.why || ""), key, buy });
+    }
+    if (!picks.length) { out.innerHTML = `<div class="notice warn">Claude's answer didn't match your commanders. Try again.</div>`; return; }
+    $("#bestStream") && ($("#bestStream").textContent = "Getting prices for suggested buys…");
+    try { await cheapestPrices([...new Set(picks.flatMap(p => p.buy.map(j => card(j)[C.name])))]); } catch {}
+    out.innerHTML = `<h3 style="margin-top:12px">Your best commanders</h3>` + picks.map(p => {
+      const c = card(p.i), cost = p.buy.reduce((a, j) => a + buyPrice(j), 0);
+      return `<div class="pick5"><div class="row" style="justify-content:space-between"><b>${esc(c[C.name])} ${idPips(c[C.id])}</b><span class="count num">${p.rating}/10</span></div>
+        <p class="small">${esc(p.why)}</p>
+        ${p.key.length ? `<p class="small"><span class="label">You own</span> ${p.key.map(j => esc(card(j)[C.name])).join(", ")}</p>` : ""}
+        ${p.buy.length ? `<p class="small"><span class="label">Worth buying</span> ${p.buy.map(j => `${esc(card(j)[C.name])} <span class="price">${money(buyPrice(j))}</span>`).join(", ")} · <b class="price">${money(cost)}</b> total</p>` : ""}
+        <div class="row"><button class="grow" data-buildcmd="${esc(c[C.name])}">Build this deck</button></div></div>`;
+    }).join("");
+    out.querySelectorAll("[data-buildcmd]").forEach(b => b.onclick = () => { $("#cmdInput").value = b.dataset.buildcmd; window.scrollTo(0, 0); build(); });
+  } catch (e) {
+    out.innerHTML = e?.code === "cancelled" ? "" : `<div class="notice bad">${esc(errText(e))}</div>`;
+  } finally { $("#bestCmdBtn").disabled = false; }
+}
+$("#bestCmdBtn").onclick = bestCommanders;
+
+/* ---------- play: test draws ---------- */
+function drawSources(){
+  const o = [];
+  if (S.current) o.push(["current", "Build tab: " + S.current.name]);
+  if (S.check?.rows?.length) o.push(["check", "Check tab list"]);
+  for (const d of S.decks) if (!S.current || d.id !== S.current.id) o.push(["d:" + d.id, d.name]);
+  return o;
+}
+function libraryFor(src){
+  const lib = []; let cmd = null, fmt = "casual";
+  const push = (i, q) => { for (let k = 0; k < q; k++) lib.push(i); };
+  const d = src === "current" ? S.current : src?.startsWith("d:") ? S.decks.find(x => "d:" + x.id === src) : null;
+  if (d) {
+    fmt = d.format; cmd = d.commander;
+    for (const c of d.cards) { const i = lookup(c.name); if (i >= 0) push(i, c.qty); }
+    for (const [n, q] of Object.entries(d.basics || {})) { const i = lookup(n); if (i >= 0) push(i, q); }
+  } else if (src === "check" && S.check) {
+    fmt = S.check.fmt;
+    for (const r of S.check.rows) { if (r.isCmd) { cmd = card(r.i)[C.name]; continue; } push(r.i, r.need); }
+  }
+  return { lib, cmd, fmt };
+}
+function shuffled(a){ const b = a.slice(); for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [b[k], b[j]] = [b[j], b[k]]; } return b; }
+function lnC(n, k){ if (k < 0 || k > n) return -Infinity; let s = 0; for (let j = 1; j <= k; j++) s += Math.log(n - k + j) - Math.log(j); return s; }
+function hyp(N, K, n, k){ return Math.exp(lnC(K, k) + lnC(N - K, n - k) - lnC(N, n)); }
+function atLeast(N, K, n, k){ let p = 0; for (let j = k; j <= Math.min(K, n); j++) p += hyp(N, K, n, j); return Math.min(1, p); }
+const pct = p => (p * 100).toFixed(p >= 0.995 || p < 0.005 ? 0 : 0) + "%";
+function renderPlay(){ renderDrawSelect(); renderDraw(); renderDrawStats(); renderLife(); renderRecords(); }
+function renderDrawSelect(){
+  const sel = $("#drawDeck"), cur = S.draw?.src || sel.value, o = drawSources();
+  sel.innerHTML = o.length ? o.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("") : `<option value="">No decks yet</option>`;
+  if (o.some(x => x[0] === cur)) sel.value = cur;
+}
+function newHand(mull){
+  const src = $("#drawDeck").value; if (!src) return;
+  const { lib, cmd, fmt } = libraryFor(src);
+  if (lib.length < 7) { $("#drawInfo").textContent = "That deck has fewer than 7 cards."; return; }
+  const m = mull ? (S.draw?.mull || 0) + 1 : 0;
+  const deck = shuffled(lib);
+  S.draw = { src, cmd, fmt, lib:deck.slice(7), hand:deck.slice(0, 7), mull:m, turn:0, toBottom: fmt === "commander" ? Math.max(0, m - 1) : m, open:new Set() };
+  renderDraw();
+}
+function renderDraw(){
+  const s = S.draw, hand = $("#drawHand");
+  if (!s || s.src !== $("#drawDeck").value) { hand.innerHTML = ""; $("#drawInfo").textContent = "Pick a deck and tap New hand."; return; }
+  const lands = s.hand.filter(i => isLand(card(i))).length;
+  $("#drawInfo").innerHTML = `${s.turn ? `Turn ${s.turn}` : "Opening hand"} · ${s.hand.length} in hand, ${lands} land${lands === 1 ? "" : "s"} · ${s.lib.length} left in library${s.mull ? ` · Mulligans: ${s.mull}` : ""}${s.cmd ? ` · Commander: ${esc(s.cmd)}` : ""}${s.toBottom ? `<br><b class="part">Tap ${s.toBottom} card${s.toBottom > 1 ? "s" : ""} to put on the bottom.</b>` : ""}`;
+  hand.innerHTML = s.hand.map((i, k) => { const c = card(i);
+    return `<button class="hcard ${isLand(c) ? "land" : ""} ${s.toBottom ? "pick" : ""}" data-k="${k}"><span class="cost">${pips(c[C.cost])}</span><b>${esc(c[C.name])}</b><span class="t">${esc(c[C.type])}</span>${s.open.has(k) ? `<img loading="lazy" alt="" src="https://api.scryfall.com/cards/named?format=image&version=small&exact=${encodeURIComponent(c[C.name].split(" // ")[0])}" onerror="this.remove()">` : ""}</button>`; }).join("");
+  hand.querySelectorAll(".hcard").forEach(b => b.onclick = () => {
+    const k = +b.dataset.k;
+    if (s.toBottom) { s.lib.push(s.hand.splice(k, 1)[0]); s.toBottom--; s.open = new Set(); }
+    else { s.open.has(k) ? s.open.delete(k) : s.open.add(k); }
+    renderDraw();
+  });
+  $("#drawOne").disabled = !!s.toBottom || !s.lib.length;
+}
+function renderDrawStats(){
+  const box = $("#drawStats"), src = $("#drawDeck").value;
+  if (!src) { box.innerHTML = ""; return; }
+  const { lib, fmt } = libraryFor(src), N = lib.length; if (N < 7) { box.innerHTML = ""; return; }
+  const L = lib.filter(i => isLand(card(i))).length;
+  const play = fmt !== "commander";
+  const keep = [2, 3, 4, 5].reduce((a, k) => a + hyp(N, L, 7, k), 0);
+  const uniq = [...new Set(lib.filter(i => !isLand(card(i))))].sort((a, b) => card(a)[C.name].localeCompare(card(b)[C.name]));
+  const key = S.drawKey != null && uniq.includes(S.drawKey) ? S.drawKey : uniq[0];
+  const K = lib.filter(i => i === key).length;
+  box.innerHTML = `<h3 style="margin-top:6px">The odds</h3>
+    <p class="small muted">${N} cards in the library, ${L} land${L === 1 ? "" : "s"} (${(L / N * 100).toFixed(0)}%). ${play ? "Turns counted on the play." : "Commander games: counted on the draw."}</p>
+    <div class="oddsgrid">
+      <span>Opening hand with 2 to 5 lands</span><b>${pct(keep)}</b>
+      <span>Average lands in opening hand</span><b>${(7 * L / N).toFixed(1)}</b>
+      <span>3 lands by turn 3</span><b>${pct(atLeast(N, L, play ? 9 : 10, 3))}</b>
+      <span>4 lands by turn 4</span><b>${pct(atLeast(N, L, play ? 10 : 11, 4))}</b>
+    </div>
+    ${uniq.length ? `<div class="field" style="margin-top:10px"><label class="label" for="drawKey">Chance of seeing a card</label><select id="drawKey">${uniq.map(i => `<option value="${i}" ${i === key ? "selected" : ""}>${esc(card(i)[C.name])}${lib.filter(j => j === i).length > 1 ? ` (${lib.filter(j => j === i).length})` : ""}</option>`).join("")}</select></div>
+    <div class="oddsgrid">${[[7, "In opening hand"], [9, "By turn 3"], [11, "By turn 5"], [13, "By turn 7"]].map(([n, l]) => `<span>${l}</span><b>${pct(atLeast(N, K, n + (play ? 0 : 1), 1))}</b>`).join("")}</div>` : ""}`;
+  if ($("#drawKey")) $("#drawKey").onchange = e => { S.drawKey = +e.target.value; renderDrawStats(); };
+}
+$("#drawDeck").onchange = () => { S.draw = null; S.drawKey = null; renderDraw(); renderDrawStats(); };
+$("#drawNew").onclick = () => newHand(false);
+$("#drawMull").onclick = () => newHand(true);
+$("#drawOne").onclick = () => { const s = S.draw; if (!s || s.toBottom || !s.lib.length) return; s.hand.push(s.lib.shift()); s.turn++; renderDraw(); };
+
+/* ---------- play: life counter and records ---------- */
+function freshPlayers(n, start, old = []){
+  return Array.from({ length:n }, (_, k) => ({ name: old[k]?.name || (k === 0 ? "You" : `Player ${k + 1}`), deck: old[k]?.deck || "", life:start, poison:0, cmd:{} }));
+}
+function lifeState(){
+  if (!S.life) S.life = { n:4, start:40, players:freshPlayers(4, 40) };
+  return S.life;
+}
+function saveLife(){ LS.set("dw.life", S.life); }
+function renderLife(){
+  const L = lifeState();
+  $("#lifePlayers").value = String(L.n); $("#lifeStart").value = String(L.start);
+  const open = new Set([...document.querySelectorAll("#lifeGrid details[open]")].map(x => x.dataset.p));
+  $("#lifeGrid").innerHTML = L.players.map((p, k) => {
+    const out = p.life <= 0 || p.poison >= 10 || Object.values(p.cmd).some(v => v >= 21);
+    const others = L.players.map((_, j) => j).filter(j => j !== k);
+    return `<div class="ptile ${out ? "out" : ""}">
+      <input type="text" class="pname" id="pname${k}" data-pn="${k}" value="${esc(p.name)}" aria-label="Player ${k + 1} name">
+      <div class="lifeRow"><button data-l="${k}" data-d="-1" aria-label="Lose 1 life">−</button><span class="life" aria-live="polite">${p.life}</span><button data-l="${k}" data-d="1" aria-label="Gain 1 life">+</button></div>
+      <div class="row" style="gap:6px"><button class="ghost mini grow" data-l="${k}" data-d="-5">−5</button><button class="ghost mini grow" data-l="${k}" data-d="5">+5</button></div>
+      <div class="counter">Poison <span class="row" style="gap:4px"><button class="mini" data-po="${k}" data-d="-1" aria-label="Remove poison">−</button><b>${p.poison}</b><button class="mini" data-po="${k}" data-d="1" aria-label="Add poison">+</button></span></div>
+      ${L.start >= 30 ? `<details data-p="${k}" ${open.has(String(k)) ? "open" : ""}><summary class="small">Commander damage</summary>${others.map(j => `<div class="counter">${esc(L.players[j].name)} <span class="row" style="gap:4px"><button class="mini" data-cd="${k}:${j}" data-d="-1">−</button><b>${p.cmd[j] || 0}</b><button class="mini" data-cd="${k}:${j}" data-d="1">+</button></span></div>`).join("")}</details>` : ""}
+      <select id="pdeck${k}" data-pd="${k}" aria-label="${esc(p.name)}'s deck"><option value="">No deck picked</option>${S.decks.map(d => `<option value="${d.id}" ${d.id === p.deck ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select>
+    </div>`;
+  }).join("");
+}
+$("#lifeGrid").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const L = lifeState(), d = +b.dataset.d;
+  if (b.dataset.l != null) L.players[+b.dataset.l].life += d;
+  else if (b.dataset.po != null) { const p = L.players[+b.dataset.po]; p.poison = Math.max(0, p.poison + d); }
+  else if (b.dataset.cd) {
+    const [k, j] = b.dataset.cd.split(":").map(Number), p = L.players[k], was = p.cmd[j] || 0, now = Math.max(0, was + d);
+    p.cmd[j] = now; p.life -= now - was;   // commander damage is also life loss
+  } else return;
+  saveLife(); renderLife();
+});
+$("#lifeGrid").addEventListener("input", e => {
+  if (e.target.dataset.pn != null) { lifeState().players[+e.target.dataset.pn].name = e.target.value.slice(0, 24); saveLife(); }
+});
+$("#lifeGrid").addEventListener("change", e => {
+  if (e.target.dataset.pd != null) { lifeState().players[+e.target.dataset.pd].deck = e.target.value; saveLife(); }
+  if (e.target.dataset.pn != null) renderLife();
+});
+function resetLife(){ const L = lifeState(); L.players = freshPlayers(L.n, L.start, L.players); saveLife(); renderLife(); }
+$("#lifePlayers").onchange = e => { const L = lifeState(); L.n = +e.target.value; resetLife(); };
+$("#lifeStart").onchange = e => { const L = lifeState(); L.start = +e.target.value; resetLife(); };
+$("#lifeReset").onclick = () => { resetLife(); $("#lifeMsg").innerHTML = ""; };
+$("#lifeWin").onclick = () => {
+  const L = lifeState();
+  $("#lifeMsg").innerHTML = `<div class="notice"><b>Who won?</b><div class="row" style="margin-top:8px">${L.players.map((p, k) => `<button class="grow" data-win="${k}">${esc(p.name)}</button>`).join("")}<button class="ghost" data-win="x">Cancel</button></div></div>`;
+  $("#lifeMsg").querySelectorAll("[data-win]").forEach(b => b.onclick = () => {
+    if (b.dataset.win === "x") { $("#lifeMsg").innerHTML = ""; return; }
+    const w = +b.dataset.win;
+    S.games.push({ date:new Date().toISOString(), players:L.players.map(p => ({ name:p.name, deckId:p.deck || null })), winner:w });
+    LS.set("dw.games", S.games);
+    const noDeck = L.players.every(p => !p.deck);
+    $("#lifeMsg").innerHTML = `<div class="notice ok">Recorded: ${esc(L.players[w].name)} won.${noDeck ? " Pick decks under each player next time to track deck records." : ""}</div>`;
+    resetLife(); renderRecords(); renderSaved();
+  });
+};
+function deckRecord(id){
+  let w = 0, l = 0;
+  for (const g of S.games || []) g.players.forEach((p, k) => { if (p.deckId === id) { if (k === g.winner) w++; else l++; } });
+  return { w, l };
+}
+function recordText(id){ const r = deckRecord(id); return r.w + r.l ? ` · ${r.w}–${r.l}` : ""; }
+function renderRecords(){
+  const box = $("#records");
+  const rows = S.decks.map(d => ({ d, ...deckRecord(d.id) })).filter(x => x.w + x.l).sort((a, b) => (b.w + b.l) - (a.w + a.l));
+  const g = S.games || [];
+  box.innerHTML = (rows.length ? `<div class="oddsgrid">${rows.map(x => `<span>${esc(x.d.name)}</span><b>${x.w}–${x.l} · ${Math.round(x.w / (x.w + x.l) * 100)}%</b>`).join("")}</div>`
+    : `<p class="small muted">${g.length ? "No games with a deck picked yet." : "Use Record winner after a game, with a deck picked for each player, to build up records."}</p>`)
+    + (g.length ? `<div class="row" style="margin-top:10px"><span class="small muted grow">${g.length} game${g.length === 1 ? "" : "s"} recorded</span><button class="ghost danger" id="undoGame">Remove last game</button></div>` : "");
+  if ($("#undoGame")) $("#undoGame").onclick = () => {
+    const b = $("#undoGame");
+    if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Tap again to remove"; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Remove last game"; } }, 3000); return; }
+    S.games.pop(); LS.set("dw.games", S.games); renderRecords(); renderSaved();
+  };
 }
 
 /* ---------- prices ---------- */
@@ -1150,7 +1723,7 @@ function renderValue(){
   const priced = (S.prints || []).length;
   box.innerHTML = `<div class="valuebox"><div class="grow"><span class="label">Collection value</span><div class="bignum">${money(collectionValue())}</div>
     <p class="small muted">${lp ? `Your exact printings and foils, Scryfall prices from ${esc(lp.date)}.` : `Estimate from typical prices (${esc(m.priceDate || m.date || "")}).${priced ? " Refresh to price your exact printings and foils." : ""}`}</p></div>
-    ${priced ? `<button id="priceBtn">Refresh prices</button>` : ""}</div><div id="priceMsg"></div>`;
+    ${priced ? `<button id="priceBtn">Refresh prices</button>` : ""}</div><div id="priceMsg"></div>${historyHTML()}`;
   if ($("#priceBtn")) $("#priceBtn").onclick = refreshPrices;
 }
 $("#collSort").onchange = e => { S.filter.sort = e.target.value; S.shown = 120; renderCollection(); };
@@ -1177,6 +1750,7 @@ async function refreshPrices(){
     }
     S.livePrices = { date:new Date().toISOString().slice(0, 10), map };
     LS.set("dw.prices", S.livePrices);
+    snapshotPrices();
     renderCollection();
     say(`Prices updated for ${found.toLocaleString()} of ${todo.length.toLocaleString()} printings.${found < todo.length ? " The rest use typical prices." : ""}`, "ok");
   } catch (e) {
@@ -1320,7 +1894,7 @@ $("#keyRemove").onclick = () => {
 
 /* ---------- backup ---------- */
 $("#bkSave").onclick = () => {
-  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints };
+  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints, games:S.games, history:S.history };
   const blob = new Blob([JSON.stringify(data)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = `deckwright-backup-${new Date().toISOString().slice(0,10)}.json`;
@@ -1341,6 +1915,8 @@ $("#bkLoad").addEventListener("change", e => {
     $("#bkApply").onclick = async () => {
       S.coll = collFromObject(data.collection); S.updatedAt = Date.now();
       S.prints = Array.isArray(data.prints) ? data.prints : []; savePrints();
+      if (Array.isArray(data.games)) { S.games = data.games; LS.set("dw.games", S.games); }
+      if (data.history) { S.history = data.history; LS.set("dw.history", S.history); }
       S.decks = Array.isArray(data.decks) ? data.decks : []; LS.set("dw.decks", S.decks);
       await persistCollection(); renderAll();
       $("#bkMsg").innerHTML = `<div class="notice ok">Restored.</div>`;
@@ -1449,9 +2025,10 @@ function showTab(t){
   document.querySelectorAll(".tabpane").forEach(p => p.hidden = p.id !== "tab-" + t);
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === t ? "page" : "false"));
   LS.set("dw.tab", t); window.scrollTo(0, 0);
+  if (t === "play") renderPlay();
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-function renderAll(){ renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); }
+function renderAll(){ renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); if (!$("#tab-play").hidden) renderPlay(); }
 
 (async function boot(){
   showTab(LS.get("dw.tab") || "collection");
