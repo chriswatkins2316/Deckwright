@@ -214,6 +214,9 @@ button.mini{min-height:32px;padding:2px 10px}
 .gnav{display:flex;justify-content:center;align-items:center;gap:12px}
 .gnav button{min-width:44px;font-size:1.2rem}
 .scanvideo{width:100%;max-height:60vh;border-radius:var(--r);background:#000;display:block;object-fit:cover}
+.scanwrap{position:relative;border-radius:var(--r);transition:box-shadow .15s}
+.scanwrap.snap{box-shadow:0 0 0 4px var(--ok)}
+.scanpill{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;font-size:.85rem;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
 .scanitem{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
 .scanitem:last-child{border-bottom:0}
 .scanitem .qty{display:flex;align-items:center;gap:4px}
@@ -277,12 +280,13 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 
     <div class="panel" id="scanPanel">
       <h2>Scan cards</h2>
-      <p class="small muted">Point your camera at a card and Claude reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil.</p>
+      <p class="small muted">Point your camera at a card and Claude reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
       <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
         <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
       <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
+      <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan: snap each card by itself once it's held steady</label>
       <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
-        <video id="scanVideo" class="scanvideo" playsinline muted autoplay></video>
+        <div class="scanwrap" id="scanWrap"><video id="scanVideo" class="scanvideo" playsinline muted autoplay></video><div class="scanpill" id="scanPill" hidden aria-live="polite"></div></div>
         <div class="row btnrow"><button class="primary" id="scanSnap">Scan this card</button><button class="ghost" id="scanStop">Stop camera</button></div>
       </div>
       <div id="scanStatus"></div>
@@ -2135,18 +2139,61 @@ Use "" for anything you can't read.`, { modelTier:"default", cache:false, images
 
 /* ================= camera scanning ================= */
 let scanStream = null, scanBusy = 0;
-function stopScan(){ if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const cam = $("#scanCam"); if (cam) cam.hidden = true; const st = $("#scanStart"); if (st) st.hidden = false; }
+function stopScan(){ autoStop(); if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const cam = $("#scanCam"); if (cam) cam.hidden = true; const st = $("#scanStart"); if (st) st.hidden = false; }
 $("#scanStart").onclick = async () => {
   if (!S.sample) return showKeyNeeded("#scanStatus");
   try {
     scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
     $("#scanVideo").srcObject = scanStream; $("#scanCam").hidden = false; $("#scanStart").hidden = true; $("#scanStatus").innerHTML = "";
+    if ($("#scanAuto").checked) autoStart();
   } catch (e) {
     console.warn(e);
     $("#scanStatus").innerHTML = `<div class="notice warn">The camera didn't start. Allow camera access for this site in your browser settings, or use <b>Use a photo</b> instead.</div>`;
   }
 };
 $("#scanStop").onclick = stopScan;
+
+/* ---------- auto-scan: snap when the picture goes still after a change ---------- */
+// Watches a tiny greyscale copy of the camera feed. Movement (a hand swapping cards) arms it;
+// once the picture has been still for a moment it snaps, then waits for the next movement.
+const AUTO = { timer:null, prev:null, still:0, armed:true, sinceMove:0, last:"" };
+const AW = 48, AH = 36, MOVE = 12, STILL = 5, STILL_FOR = 3;
+let autoCanvas = null;
+function autoFrame(v){
+  if (!autoCanvas) { autoCanvas = document.createElement("canvas"); autoCanvas.width = AW; autoCanvas.height = AH; }
+  const g = autoCanvas.getContext("2d", { willReadFrequently:true });
+  g.drawImage(v, 0, 0, AW, AH);
+  const d = g.getImageData(0, 0, AW, AH).data, out = new Float32Array(AW * AH);
+  let sum = 0;
+  for (let k = 0, j = 0; k < d.length; k += 4, j++) { out[j] = d[k] * .299 + d[k + 1] * .587 + d[k + 2] * .114; sum += out[j]; }
+  const mean = sum / out.length; let vr = 0; for (const x of out) vr += (x - mean) ** 2;
+  out.detail = Math.sqrt(vr / out.length);
+  return out;
+}
+function autoPill(t){ const p = $("#scanPill"); if (!p) return; p.hidden = !t; p.textContent = t || ""; }
+function autoTick(){
+  const v = $("#scanVideo");
+  if (!scanStream || !v.videoWidth) return;
+  const f = autoFrame(v), prev = AUTO.prev; AUTO.prev = f;
+  if (!prev) return;
+  let diff = 0; for (let j = 0; j < f.length; j++) diff += Math.abs(f[j] - prev[j]); diff /= f.length;
+  if (diff > MOVE) { AUTO.armed = true; AUTO.still = 0; if (!scanBusy || scanBusy < 3) autoPill("Hold the card steady…"); return; }
+  if (diff > STILL) { AUTO.still = 0; return; }
+  AUTO.still++;
+  if (!AUTO.armed) { autoPill(AUTO.last ? `${AUTO.last} · swap in the next card` : "Swap in the next card"); return; }
+  if (AUTO.still < STILL_FOR) { autoPill("Hold the card steady…"); return; }
+  if (f.detail < 14) { autoPill("Point the camera at a card"); return; }   // blank or dark picture
+  if (scanBusy >= 3) { autoPill("Catching up…"); return; }
+  AUTO.armed = false; AUTO.still = 0;
+  const w = $("#scanWrap"); w.classList.add("snap"); setTimeout(() => w.classList.remove("snap"), 220);
+  try { navigator.vibrate?.(40); } catch {}
+  autoPill("Got it, reading…");
+  scanImage(frameToJpeg(v, v.videoWidth, v.videoHeight), $("#scanFoil").checked, true);
+}
+function autoStart(){ autoStop(); AUTO.prev = null; AUTO.still = 0; AUTO.armed = true; AUTO.last = ""; AUTO.timer = setInterval(autoTick, 220); autoPill("Hold a card in view"); }
+function autoStop(){ if (AUTO.timer) clearInterval(AUTO.timer); AUTO.timer = null; autoPill(""); }
+$("#scanAuto").checked = LS.get("dw.autoscan") !== false;
+$("#scanAuto").onchange = e => { LS.set("dw.autoscan", e.target.checked); if (!scanStream) return; e.target.checked ? autoStart() : autoStop(); };
 function frameToJpeg(source, w, h){
   const scale = Math.min(1, 1400 / Math.max(w, h)), c = document.createElement("canvas");
   c.width = Math.round(w * scale); c.height = Math.round(h * scale);
@@ -2165,7 +2212,7 @@ $("#scanFile").addEventListener("change", e => {
   img.src = URL.createObjectURL(f);
 });
 function scanSay(){ $("#scanStatus").innerHTML = scanBusy ? `<div class="progress" style="margin-top:8px"><div class="spin"></div><span>Reading ${scanBusy} card photo${scanBusy > 1 ? "s" : ""}… you can keep scanning.</span></div>` : ""; }
-async function scanImage(data, foil){
+async function scanImage(data, foil, auto){
   scanBusy++; scanSay();
   try {
     const r = await S.sample.json(`This photo shows one or more Magic: The Gathering cards. Identify each card that is clearly visible.
@@ -2174,8 +2221,11 @@ If the card is in another language, give its English name. Skip tokens, art card
 Reply with only JSON: {"cards":[{"name":"","set":"","collector_number":"","confidence":"high"}]}
 Use "" for anything you can't read, and confidence "high", "medium" or "low". If no card is visible, return {"cards":[]}.`, { modelTier:"default", cache:false, images:[{ media_type:"image/jpeg", data }] });
     const found = Array.isArray(r?.cards) ? r.cards : [];
-    if (!found.length) { $("#scanStatus").innerHTML = ""; flashScan("No card found in that photo. Try again with the card filling more of the frame.", "warn"); return; }
-    for (const x of found) await addScanned(x, foil);
+    if (!found.length) {
+      if (auto) { if (AUTO.timer) autoPill("No card seen. Hold one in view"); return; }
+      $("#scanStatus").innerHTML = ""; flashScan("No card found in that photo. Try again with the card filling more of the frame.", "warn"); return;
+    }
+    for (const x of found) { const n = await addScanned(x, foil); if (n && auto) { AUTO.last = n; if (AUTO.timer && !AUTO.armed) autoPill(`${n} · swap in the next card`); } }
   } catch (e) {
     flashScan(errText(e), "bad");
   } finally { scanBusy--; scanSay(); }
@@ -2198,6 +2248,7 @@ async function addScanned(x, foil){
   const same = S.scan.find(s => s.name === name && s.set === set && s.cn === cn && s.finish === finish);
   if (same) same.qty++; else S.scan.unshift({ name, set, cn, finish, qty:1, unsure });
   LS.set("dw.scan", S.scan); renderScanList();
+  return name;
 }
 function renderScanList(){
   const box = $("#scanList"); if (!box || !S.scan) return;
