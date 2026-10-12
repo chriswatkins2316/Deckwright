@@ -460,12 +460,12 @@ function parseCSV(text){
   return rows.filter(r => r.some(x => x.trim() !== ""));
 }
 function readImport(text){
-  const out = new Map(), unmatched = new Map(), prints = [], binders = new Map(); let lines = 0;
+  const out = new Map(), unmatched = new Map(), prints = [], binders = new Map(), unmatchedRows = []; let lines = 0;
   const add = (name, qty, pr) => {
     qty = Math.max(0, parseInt(qty,10) || 0); if (!qty || !name) return;
     lines++;
     const i = lookup(name);
-    if (i < 0) unmatched.set(name, (unmatched.get(name)||0) + qty);
+    if (i < 0) { unmatched.set(name, (unmatched.get(name)||0) + qty); unmatchedRows.push({ name:String(name).trim(), qty, ...(pr || {}) }); }
     else { out.set(i, (out.get(i)||0) + qty); if (pr) prints.push({ ...pr, name:card(i)[C.name], qty }); }
     return i;
   };
@@ -499,7 +499,7 @@ function readImport(text){
       if (m) add(m[2], m[1]); else add(l, 1);
     }
   }
-  return { out, unmatched, lines, prints, binders };
+  return { out, unmatched, lines, prints, binders, unmatchedRows };
 }
 function showPreview(res){
   S.pending = res;
@@ -508,7 +508,7 @@ function showPreview(res){
   const box = $("#importPreview"); box.hidden = false;
   box.innerHTML = `
     <div class="notice ${miss.length ? "warn" : "ok"}">Found <b class="num">${total.toLocaleString()}</b> cards (<span class="num">${res.out.size.toLocaleString()}</span> different).
-      ${miss.length ? `<br><span class="num">${miss.length}</span> name${miss.length>1?"s":""} didn't match any card and will be skipped.` : ""}</div>
+      ${miss.length ? `<br><span class="num">${miss.length}</span> name${miss.length>1?"s":""} didn't match any card and will be skipped unless you look them up.${(res.unmatchedRows || []).length ? ` <button class="mini" id="lookupBtn" style="margin-top:6px">Look them up on Scryfall</button>` : ""}` : ""}${res.lookupNote || ""}</div>
     ${miss.length ? `<details><summary class="small">Show unmatched names</summary><p class="small muted" style="margin-top:6px">${miss.slice(0,80).map(([n,q])=>`${q} ${esc(n)}`).join("<br>")}${miss.length>80?"<br>…":""}</p></details>` : ""}
     ${binderPick(res)}
     <div class="row">
@@ -519,6 +519,7 @@ function showPreview(res){
   $("#replaceBtn").onclick = () => applyImport(false);
   if ($("#mergeBtn")) $("#mergeBtn").onclick = () => applyImport(true);
   $("#cancelImport").onclick = () => { box.hidden = true; S.pending = null; };
+  if ($("#lookupBtn")) $("#lookupBtn").onclick = () => resolveUnmatched(res);
 }
 async function applyImport(merge){
   const res = S.pending; if (!res) return;
@@ -1722,42 +1723,89 @@ function renderValue(){
   const lp = S.livePrices, m = window.MTG_DB?.meta || {};
   const priced = (S.prints || []).length;
   box.innerHTML = `<div class="valuebox"><div class="grow"><span class="label">Collection value</span><div class="bignum">${money(collectionValue())}</div>
-    <p class="small muted">${lp ? `Your exact printings and foils, Scryfall prices from ${esc(lp.date)}.` : `Estimate from typical prices (${esc(m.priceDate || m.date || "")}).${priced ? " Refresh to price your exact printings and foils." : ""}`}</p></div>
+    <p class="small muted">${lp ? (lp.partial ? `Partly refreshed: ${(lp.done || []).length.toLocaleString()} of ${(lp.total || 0).toLocaleString()} printings priced on ${esc(lp.date)}. Tap Refresh prices to finish.` : `Your exact printings and foils, Scryfall prices from ${esc(lp.date)}.`) : `Estimate from typical prices (${esc(m.priceDate || m.date || "")}).${priced ? " Refresh to price your exact printings and foils." : ""}`}</p></div>
     ${priced ? `<button id="priceBtn">Refresh prices</button>` : ""}</div><div id="priceMsg"></div>${historyHTML()}`;
   if ($("#priceBtn")) $("#priceBtn").onclick = refreshPrices;
 }
 $("#collSort").onchange = e => { S.filter.sort = e.target.value; S.shown = 120; renderCollection(); };
 const priceOf = (d, finish) => { const n = k => d.prices?.[k] ? +d.prices[k] : 0;
   return finish === "etched" ? (n("usd_etched") || n("usd_foil") || n("usd")) : finish === "foil" ? (n("usd_foil") || n("usd_etched") || n("usd")) : (n("usd") || n("usd_foil") || n("usd_etched")); };
-async function refreshPrices(){
-  const btn = $("#priceBtn"), say = (t, k = "") => { const b = $("#priceMsg"); if (b) b.innerHTML = `<div class="notice ${k}">${esc(t)}</div>`; };
-  const todo = [...new Map((S.prints || []).filter(p => p.set && p.cn).map(p => [`${p.set}|${p.cn}`, p])).values()];
-  if (!todo.length) return;
-  if (btn) btn.disabled = true;
-  const map = {}; let found = 0, failed = 0;
-  try {
-    for (let k = 0; k < todo.length; k += 40) {
-      say(`Getting prices… ${Math.min(k + 40, todo.length)} of ${todo.length} printings`);
-      const q = todo.slice(k, k + 40).map(p => `(e:${p.set.replace(/[^a-z0-9]/g, "")} cn:"${p.cn.replace(/"/g, "")}")`).join(" or ");
-      let res = [];
-      try { res = await sfSearch(q, null, "prints"); }
-      catch (e) { if (/answered 4\d\d/.test(e.message)) { failed++; continue; } throw e; }
-      for (const d of res) {
-        found++;
-        for (const fin of ["normal","foil","etched"]) { const v = priceOf(d, fin); if (v) map[`${d.set}|${d.collector_number}|${fin}`] = v; }
-      }
-      await sleep(120);
+// One Scryfall request with patience: retries after network hiccups and when Scryfall says "slow down".
+async function sfFetch(url, opts = {}, tries = 3){
+  for (let k = 0; ; k++) {
+    let r;
+    try { r = await fetch(url, opts); }
+    catch (e) {
+      if (k < tries) { await sleep(1500 * (k + 1)); continue; }
+      throw Object.assign(new Error("no answer from Scryfall"), { code:"network" });
     }
-    S.livePrices = { date:new Date().toISOString().slice(0, 10), map };
-    LS.set("dw.prices", S.livePrices);
-    snapshotPrices();
-    renderCollection();
-    say(`Prices updated for ${found.toLocaleString()} of ${todo.length.toLocaleString()} printings.${found < todo.length ? " The rest use typical prices." : ""}`, "ok");
-  } catch (e) {
-    console.warn(e);
-    say("Couldn't reach Scryfall. Check your connection and try again.", "bad");
-    if ($("#priceBtn")) $("#priceBtn").disabled = false;
+    if (r.status === 429 || r.status >= 500) {
+      if (k < tries) { await sleep(r.status === 429 ? 4000 * (k + 1) : 2000 * (k + 1)); continue; }
+      throw Object.assign(new Error(r.status === 429 ? "Scryfall asked the app to slow down" : "Scryfall had a server error (" + r.status + ")"), { code: r.status === 429 ? "rate" : "server" });
+    }
+    return r;
   }
+}
+async function priceBatchPost(batch){
+  const r = await fetch("https://api.scryfall.com/cards/collection", { method:"POST", headers:{ "content-type":"application/json" },
+    body:JSON.stringify({ identifiers: batch.map(p => ({ set:p.set, collector_number:p.cn })) }) });
+  if (r.status === 429 || r.status >= 500) throw Object.assign(new Error("retry"), { code:"retry" });
+  if (!r.ok) throw Object.assign(new Error("post " + r.status), { code:"nopost" });
+  return (await r.json()).data || [];
+}
+async function priceBatchSearch(batch){
+  const q = batch.map(p => `(e:${p.set.replace(/[^a-z0-9]/g, "")} cn:"${p.cn.replace(/"/g, "")}")`).join(" or ");
+  return sfSearch(q, null, "prints");
+}
+async function refreshPrices(){
+  const btn = $("#priceBtn"), say = (t, k = "") => { const b = $("#priceMsg"); if (b) b.innerHTML = `<div class="notice ${k}">${t}</div>`; };
+  const all = [...new Map((S.prints || []).filter(p => p.set && p.cn).map(p => [`${p.set}|${p.cn}`, p])).values()];
+  if (!all.length) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const prev = S.livePrices || {};
+  const done = new Set(prev.date === today && prev.done ? prev.done : []);   // resume a run that stopped part way today
+  const map = { ...(prev.map || {}) };
+  const todo = all.filter(p => !done.has(`${p.set}|${p.cn}`));
+  if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
+  let lock = null; try { lock = await navigator.wakeLock?.request("screen"); } catch {}
+  const save = partial => { S.livePrices = { date:today, map, done:[...done], partial, total:all.length }; LS.set("dw.prices", S.livePrices); };
+  let usePost = !LS.get("dw.nopost"), found = 0, stopped = null;
+  const size = () => usePost ? 75 : 40;
+  for (let k = 0; k < todo.length; ) {
+    const batch = todo.slice(k, k + size());
+    say(`Getting prices… ${(done.size + batch.length).toLocaleString()} of ${all.length.toLocaleString()} printings. Keep the app open.`);
+    let res = null;
+    for (let attempt = 0; attempt < 4 && res === null; attempt++) {
+      try { res = usePost ? await priceBatchPost(batch) : await priceBatchSearch(batch); }
+      catch (e) {
+        if (usePost && (e.code === "nopost" || e.name === "TypeError") && attempt === 0) { usePost = false; S._postFailed = true; continue; }  // fall back to search
+        if (/answered 4\d\d/.test(e.message || "")) { res = []; break; }   // a bad set code in this batch; skip it
+        if (attempt < 3) { await sleep(e.code === "retry" ? 4000 * (attempt + 1) : 1500 * (attempt + 1)); continue; }
+        stopped = e; break;
+      }
+    }
+    if (stopped) break;
+    if (S._postFailed) { LS.set("dw.nopost", true); S._postFailed = false; }
+    for (const d of res) {
+      found++;
+      for (const fin of ["normal","foil","etched"]) { const v = priceOf(d, fin); if (v) map[`${d.set}|${d.collector_number}|${fin}`] = v; }
+    }
+    for (const p of batch) done.add(`${p.set}|${p.cn}`);
+    save(true);
+    k += batch.length;
+    await sleep(150);
+  }
+  try { await lock?.release(); } catch {}
+  if (btn) { btn.disabled = false; btn.textContent = "Refresh prices"; }
+  if (stopped) {
+    save(true); renderCollection();
+    say(`Got prices for ${done.size.toLocaleString()} of ${all.length.toLocaleString()} printings, then Scryfall stopped answering (${stopped.code === "retry" || stopped.code === "rate" ? "it asked the app to slow down" : stopped.code === "server" ? "Scryfall had a server problem" : "no answer, maybe the connection dropped or the app was paused"}). Your progress is saved. Wait a minute and tap <b>Refresh prices</b> to carry on from where it stopped.`, "warn");
+    return;
+  }
+  save(false);
+  snapshotPrices();
+  renderCollection();
+  say(`Prices updated for ${all.length.toLocaleString()} printings.${found < todo.length ? ` Scryfall had no price for ${(todo.length - found).toLocaleString()} of them, so those use typical prices.` : ""}`, "ok");
 }
 async function cheapestPrices(names){
   const day = 864e5, now = Date.now();
@@ -1925,6 +1973,60 @@ $("#bkLoad").addEventListener("change", e => {
   r.readAsText(f);
 });
 
+/* ---------- resolve unmatched import rows through Scryfall ---------- */
+async function resolveUnmatched(res){
+  const btn = $("#lookupBtn"); if (btn) btn.disabled = true;
+  const rows = (res.unmatchedRows || []).filter(r => res.unmatched.has(r.name));
+  const groups = new Map();
+  for (const r of rows) { const k = r.id ? "id:" + r.id : r.set && r.cn ? `sc:${r.set}/${r.cn}` : "n:" + r.name; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+  let n = 0, fixed = 0, added = 0, extras = 0, notFound = 0, offline = false;
+  const newRows = [], extraNames = new Set();
+  for (const [k, list] of groups) {
+    n++; if (btn) btn.textContent = `Looking up ${n} of ${groups.size}…`;
+    const r0 = list[0], qty = list.reduce((a, x) => a + x.qty, 0);
+    const url = k.startsWith("id:") ? `https://api.scryfall.com/cards/${encodeURIComponent(r0.id)}`
+      : k.startsWith("sc:") ? `https://api.scryfall.com/cards/${encodeURIComponent(r0.set)}/${encodeURIComponent(r0.cn)}`
+      : `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(r0.name)}`;
+    let d = null;
+    try {
+      const resp = await fetch(url);
+      if (resp.status === 404) { notFound += qty; await sleep(100); continue; }
+      if (!resp.ok) throw new Error("Scryfall " + resp.status);
+      d = await resp.json();
+    } catch (e) { console.warn(e); offline = true; break; }
+    const nonGame = SKIP_LAYOUTS.has(d.layout) || SKIP_SET_TYPES.has(d.set_type) || /^Token\b|\bEmblem\b/.test(d.type_line || "");
+    let i = nonGame ? -1 : lookup(d.name);
+    if (i < 0) {
+      const row = nonGame ? null : toRow(d);
+      if (!row) { extras += qty; for (const x of list) { res.unmatched.delete(x.name); extraNames.add(x.name); } await sleep(100); continue; }
+      S.cards.push(row); i = S.cards.length - 1; S.byNorm.set(norm(row[0]), i); newRows.push(row); added++;
+    }
+    for (const x of list) {
+      res.out.set(i, (res.out.get(i) || 0) + x.qty);
+      if (x.set && x.cn || x.id) res.prints.push({ id:x.id || "", set:(x.set || d.set || "").toLowerCase(), cn:x.cn || d.collector_number || "", finish:x.finish || "normal", name:card(i)[C.name], qty:x.qty });
+      res.unmatched.delete(x.name);
+    }
+    fixed += qty;
+    await sleep(100);   // Scryfall asks for 50-100 ms between requests
+  }
+  if (newRows.length) {
+    const meta = window.MTG_DB.meta || {};
+    const ov = LS.get(OV_LS) || { date:meta.date, added:[], flags:{}, banned:meta.banned || {} };
+    ov.added = [...(ov.added || []).filter(r => !newRows.some(x => x[0] === r[0])), ...newRows];
+    try { localStorage.setItem(OV_LS, JSON.stringify(ov)); } catch {}
+    reindex();
+  }
+  res.unmatchedRows = (res.unmatchedRows || []).filter(r => res.unmatched.has(r.name));
+  const parts = [];
+  if (fixed) parts.push(`Matched ${fixed} card${fixed === 1 ? "" : "s"}${added ? `, adding ${added} that ${added === 1 ? "was" : "were"} missing from the app's card list` : ""}.`);
+  if (extras) parts.push(`${extras} ${extras === 1 ? "is a token, art card or other non-game card" : "are tokens, art cards or other non-game cards"} and will be skipped${extraNames.size ? ` (${esc([...extraNames].slice(0, 6).join(", "))}${extraNames.size > 6 ? ", …" : ""})` : ""}.`);
+  if (notFound) parts.push(`${notFound} couldn't be found on Scryfall.`);
+  if (offline) parts.push("Couldn't reach Scryfall for the rest. Try again when you're online.");
+  if (!parts.length) parts.push("Nothing new found.");
+  res.lookupNote = `<br><b>${parts.join(" ")}</b>`;
+  showPreview(res);
+}
+
 /* ---------- card data updates from Scryfall ---------- */
 const OV_LS = "dw.cardupdates";
 const BITS = { standard:1, pioneer:2, modern:4, legacy:8, commander:16 };
@@ -1961,7 +2063,7 @@ async function sfSearch(q, onPage, unique = "cards"){
   let url = "https://api.scryfall.com/cards/search?unique=" + unique + "&q=" + encodeURIComponent(q);
   const out = [];
   while (url) {
-    const r = await fetch(url);
+    const r = await sfFetch(url);
     if (r.status === 404) break;          // Scryfall's "no cards found"
     if (!r.ok) throw new Error("Scryfall answered " + r.status);
     const j = await r.json();
