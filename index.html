@@ -467,6 +467,9 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
     <div class="panel">
       <h2>Card data</h2>
       <p class="small" id="cardDataInfo">Loading…</p>
+      <p class="small" id="comboDataInfo"></p>
+      <details><summary class="small">Automatic weekly updates</summary>
+        <p class="small" style="margin-top:6px">A job in your GitHub repository refreshes the cards, prices and combos every Monday. To run it now: open your repository on GitHub, tap <b>Actions</b>, pick <b>Update card and combo data</b>, then <b>Run workflow</b>. Give it a few minutes, then open the app twice.</p></details>
       <div class="row"><button class="grow" id="updCards">Check Scryfall for new cards</button></div>
       <p class="small muted">Adds newly printed cards and picks up ban list changes and Standard rotation. Takes about 20 seconds.</p>
       <div id="updMsg"></div>
@@ -2358,25 +2361,45 @@ function attachCardSearch(input, box, onPick){
 
 /* ---------- combos (Commander Spellbook) ---------- */
 const CSB = "https://backend.commanderspellbook.com";
+// Combos are matched on the device against combos.json, which the weekly GitHub job builds from
+// Commander Spellbook's published export (their server doesn't accept calls from other sites).
+let COMBOS = null, combosTried = false;
+async function loadCombos(){
+  if (COMBOS || combosTried) return COMBOS;
+  combosTried = true;
+  try {
+    const r = await fetch("combos.json"); if (!r.ok) return null;
+    const d = await r.json();
+    d.map = d.n.map(n => lookup(n));                      // their card names -> our card list
+    COMBOS = d; renderSettings();
+  } catch (e) { console.warn("no combo data", e); }
+  return COMBOS;
+}
+function comboObj(row, d){
+  const [id, cards, prod, pop, req, ident, mana] = row;
+  return { id, popularity:pop, identity:ident, manaNeeded:mana, description:"",
+    uses: cards.map(k => ({ card:{ name: d.map[k] >= 0 ? card(d.map[k])[C.name] : d.n[k] } })),
+    produces: prod.map(k => ({ feature:{ name:d.f[k] } })), requires: req.map(k => ({ template:{ name:d.p[k] } })) };
+}
 async function csbFindCombos(main, commanders){
-  const body = JSON.stringify({ main: main.map(([n, q]) => ({ card:n, quantity:q })), commanders: (commanders || []).map(n => ({ card:n, quantity:1 })) });
-  const out = { included:[], almostIncluded:[] };
-  let url = CSB + "/find-my-combos?limit=250", pages = 0;
-  while (url && pages < 4) {
-    let r;
-    for (let k = 0; ; k++) {
-      try { r = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body }); }
-      catch (e) { if (k < 2) { await sleep(1500 * (k + 1)); continue; } throw Object.assign(new Error("Commander Spellbook didn't answer"), { code:"network" }); }
-      if ((r.status === 429 || r.status >= 500) && k < 2) { await sleep(3000 * (k + 1)); continue; }
-      break;
+  const d = await loadCombos();
+  if (!d) throw Object.assign(new Error("the combo data isn't in your app yet. Run the weekly GitHub job once, see Settings"), { code:"nodata" });
+  const have = new Set();
+  for (const [n] of main) { const i = lookup(n); if (i >= 0) have.add(i); }
+  for (const n of commanders || []) { const i = lookup(n); if (i >= 0) have.add(i); }
+  const deckIdent = commanders?.length ? new Set(card(lookup(commanders[0]))[C.id]) : null;
+  const included = [], almostIncluded = [];
+  for (const row of d.c) {
+    let missing = 0;
+    for (const k of row[1]) { if (!have.has(d.map[k])) { missing++; if (missing > 1) break; } }
+    if (missing === 0) included.push(comboObj(row, d));
+    else if (missing === 1) {
+      if (deckIdent && row[5] !== "C" && ![...row[5]].every(x => deckIdent.has(x))) continue;
+      if (row[1].some(k => d.map[k] < 0)) continue;           // a piece we can't show or price
+      almostIncluded.push(comboObj(row, d));
     }
-    if (!r.ok) throw Object.assign(new Error("Commander Spellbook answered " + r.status), { code:"server" });
-    const j = await r.json(), res = j.results || {};
-    out.included.push(...(res.included || [])); out.almostIncluded.push(...(res.almostIncluded || []));
-    url = j.next; pages++;
-    if (url) await sleep(800);
   }
-  return out;
+  return { included, almostIncluded };
 }
 const comboCards = v => (v.uses || []).map(u => u.card?.name).filter(Boolean);
 const comboTemplates = v => (v.requires || []).map(t => t.template?.name).filter(Boolean);
@@ -2387,10 +2410,10 @@ function comboHTML(v, inList){
     <div class="cpills">${cards.map(n => { const have = inList(n), i = lookup(n);
       return `<span class="cpill ${have ? "own" : "miss"}">${esc(n)}${have ? "" : ` · need${i >= 0 ? " " + money(buyPrice(i)) : ""}`}</span>`; }).join("")}${extra.map(t => `<span class="cpill">+ ${esc(t)}</span>`).join("")}</div>
     ${prod ? `<span class="small">${esc(prod)}</span>` : ""}
-    <details><summary class="small">How it works</summary>
+    <details><summary class="small">How it works${v.description ? "" : " (steps on Commander Spellbook)"}</summary>
       ${v.easyPrerequisites ? `<p class="small muted" style="white-space:pre-wrap">${esc(v.easyPrerequisites)}</p>` : ""}
       ${v.notablePrerequisites ? `<p class="small" style="white-space:pre-wrap">${esc(v.notablePrerequisites)}</p>` : ""}
-      <p class="small" style="white-space:pre-wrap">${esc(v.description || "")}</p>
+      ${v.description ? `<p class="small" style="white-space:pre-wrap">${esc(v.description)}</p>` : ""}
       ${v.manaNeeded ? `<p class="small muted">Mana needed: ${pips(v.manaNeeded)}</p>` : ""}
       <a class="small" href="https://commanderspellbook.com/combo/${encodeURIComponent(v.id)}/" target="_blank" rel="noopener">Open on Commander Spellbook</a>
     </details></div>`;
@@ -2432,7 +2455,7 @@ async function bracketPanel(box, entries, commander, fmt, deckId){
       <ul class="tight small">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
       <p class="small muted">${b === 2 ? "Could be Bracket 1 (Exhibition) if it's built purely around a theme. " : b === 4 ? "Bracket 5 (cEDH) only if it's tuned for competitive play. " : ""}Brackets are a starting point for the pre-game talk, not hard rules.</p>
       ${list("Game Changers", gc)}${list("Extra turns", extra)}${list("Mass land denial", mld)}${list("Tutors", tutors, "(no bracket limit)")}` : ""}
-      ${comboErr ? `<div class="notice warn">Couldn't reach Commander Spellbook (${esc(comboErr)}).${isCmd ? " The bracket above doesn't count combos." : ""}${S.sample ? ` <button class="mini" id="comboClaude">Ask Claude to look for combos</button>` : ""}</div><div id="comboClaudeOut"></div>` : ""}
+      ${comboErr ? `<div class="notice warn">Couldn't check combos: ${esc(comboErr)}.${isCmd ? " The bracket above doesn't count combos." : ""}${S.sample ? ` <button class="mini" id="comboClaude">Ask Claude to look for combos</button>` : ""}</div><div id="comboClaudeOut"></div>` : ""}
       ${combos ? `<h3 style="margin-top:12px">Combos in this deck <span class="num muted">${combos.included.length}</span></h3>
         ${combos.included.length ? combos.included.slice(0, 40).map(v => comboHTML(v, inList)).join("") : `<p class="small muted">No known combos found.</p>`}
         ${almost.length ? `<details style="margin-top:8px"><summary>One card away <span class="num muted">${almost.length}</span></summary>${almost.slice(0, 40).map(v => comboHTML(v, inList)).join("")}</details>` : ""}
@@ -2480,7 +2503,7 @@ async function collectionCombos(){
       <p class="small muted" style="margin-top:6px">Combo data from <a href="https://commanderspellbook.com" target="_blank" rel="noopener">Commander Spellbook</a>.</p>`;
   } catch (e) {
     console.warn(e);
-    out.innerHTML = `<div class="notice bad">Couldn't reach Commander Spellbook (${esc(e.message || "no answer")}). Try again in a minute. You can still check single decks, where Claude can look for combos instead.</div>`;
+    out.innerHTML = `<div class="notice bad">${e.code === "nodata" ? "Combo data isn't in your app yet. Run the <b>Update card and combo data</b> job on GitHub once (Settings, Card data explains how). Single decks can still use Claude to look for combos." : esc(e.message || "Something went wrong.")}</div>`;
   } finally { btn.disabled = false; }
 }
 $("#comboBtn").onclick = collectionCombos;
@@ -2915,6 +2938,7 @@ function renderSettings(){
     ? `<div class="notice ok">Key saved on this device (ends in …${esc(k.slice(-4))}).</div>`
     : `<div class="notice warn">No key yet. Your collection, the Check tab and shopping lists all work without one.</div>`;
   const m = window.MTG_DB?.meta || {};
+  if ($("#comboDataInfo")) $("#comboDataInfo").textContent = COMBOS ? `${COMBOS.c.length.toLocaleString()} combos from Commander Spellbook${COMBOS.t ? ", updated " + String(COMBOS.t).slice(0, 10) : ""}.` : combosTried ? "No combo data yet. Run the GitHub job below once." : "";
   $("#cardDataInfo").textContent = S.cards.length
     ? `${S.cards.length.toLocaleString()} cards from Scryfall, current to ${S.overlayDate || m.date || "an unknown date"}.`
     : "Loading…";
@@ -3060,6 +3084,8 @@ function toRow(d){
 }
 function applyOverlay(){
   const ov = LS.get(OV_LS); if (!ov) return;
+  const base = window.MTG_DB?.meta?.date;
+  if (base && ov.date && ov.date < base) { try { localStorage.removeItem(OV_LS); } catch {} return; }   // the weekly cards.js is newer
   const at = new Map(S.cards.map((c, i) => [c[0], i]));
   for (const row of ov.added || []) { const i = at.get(row[0]); if (i !== undefined) S.cards[i] = row; else { at.set(row[0], S.cards.length); S.cards.push(row); } }
   for (const [n, f] of Object.entries(ov.flags || {})) { const i = at.get(n); if (i !== undefined) { S.cards[i] = S.cards[i].slice(); S.cards[i][8] = f; } }
