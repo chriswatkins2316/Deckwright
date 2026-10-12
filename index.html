@@ -200,6 +200,9 @@ button.mini{min-height:32px;padding:2px 10px}
 .qrbox{background:#fff;padding:10px;border-radius:8px;width:min(260px,100%);margin:0 auto}
 .qrbox svg{display:block;width:100%;height:auto}
 .answer{white-space:pre-wrap;line-height:1.55}
+.ltext{white-space:pre-wrap;line-height:1.5;margin:6px 0}
+.lface+.lface{border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+.lface p{margin:2px 0}
 .gallery{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px}
 .gtrack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;border-radius:8px}
 .gtrack::-webkit-scrollbar{display:none}
@@ -449,7 +452,13 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="row btnrow"><button id="gnAdd">Add a player</button><button class="primary" id="gnGo">Suggest my deck</button></div>
       <div id="gnOut"></div>
     </div>
-    <div class="panel">
+    <div class="panel" id="lookupPanel">
+      <h2>Card lookup</h2>
+      <p class="small muted">Look up any card, owned or not: what it looks like, what it does, where it's legal, what it costs and its official rulings.</p>
+      <div class="field autocomplete"><label class="label" for="lookCard">Card name</label><input type="search" id="lookCard" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="lookSugg" hidden></div></div>
+      <div id="lookOut"></div>
+    </div>
+    <div class="panel" id="rulingsPanel">
       <h2>Rulings</h2>
       <p class="small muted">Ask how cards work, alone or together. Answers use each card's rules text and its official rulings from Scryfall.</p>
       <div class="field autocomplete"><label class="label" for="ruleCard">Cards involved</label><input type="text" id="ruleCard" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="ruleSugg" hidden></div></div>
@@ -2748,15 +2757,85 @@ function renderRuleCards(){
   $("#ruleCards").querySelectorAll("[data-rk]").forEach(b => b.onclick = () => { S.ruleCards.splice(+b.dataset.rk, 1); renderRuleCards(); });
 }
 attachCardSearch($("#ruleCard"), $("#ruleSugg"), i => { const n = card(i)[C.name]; if (!S.ruleCards.includes(n) && S.ruleCards.length < 6) S.ruleCards.push(n); renderRuleCards(); });
-S.rulingCache = {};
-async function getRulings(name){
-  if (S.rulingCache[name]) return S.rulingCache[name];
+S.rulingCache = {}; S.sfCardCache = {};
+async function getCardJSON(name){
+  if (S.sfCardCache[name]) return S.sfCardCache[name];
   const r = await sfFetch("https://api.scryfall.com/cards/named?exact=" + encodeURIComponent(name));
   if (!r.ok) throw new Error("Scryfall couldn't find " + name);
-  const c = await r.json(); await sleep(100);
+  return (S.sfCardCache[name] = await r.json());
+}
+async function getRulings(name){
+  if (S.rulingCache[name]) return S.rulingCache[name];
+  const c = await getCardJSON(name); await sleep(100);
   const rr = await sfFetch(c.rulings_uri); const j = await rr.json();
   return (S.rulingCache[name] = (j.data || []).map(x => ({ date:x.published_at, text:x.comment })));
 }
+
+/* ---------- card lookup ---------- */
+const LOOK_FMTS = ["standard","pioneer","modern","legacy","commander"];
+function bannedIn(name){
+  const b = (LS.get("dw.cardupdates")?.banned) || window.MTG_DB?.meta?.banned || {};
+  return LOOK_FMTS.filter(f => (b[f] || []).includes(name));
+}
+function symText(t){ return esc(t || "").replace(/\{([^}]+)\}/g, m => pips(m)); }
+function faceHTML(f){
+  return `<div class="lface">
+    <p><b>${esc(f.name)}</b> <span class="cost">${pips(f.mana_cost || "")}</span></p>
+    <p class="small muted">${esc(f.type_line || "")}${f.power != null ? ` · ${esc(f.power)}/${esc(f.toughness)}` : f.loyalty ? ` · Loyalty ${esc(f.loyalty)}` : f.defense ? ` · Defense ${esc(f.defense)}` : ""}</p>
+    ${f.oracle_text ? `<p class="ltext">${symText(f.oracle_text)}</p>` : ""}
+    ${f.flavor_text ? `<p class="small muted ltext"><i>${esc(f.flavor_text)}</i></p>` : ""}</div>`;
+}
+function showLookup(i){
+  const c = card(i), name = c[C.name], out = $("#lookOut");
+  const own = S.coll.get(i) || 0, used = (S._useAll || useMap()).get(name), ban = bannedIn(name);
+  const legal = LOOK_FMTS.map(f => { const ok = legalIn(c, f), b = ban.includes(f);
+    return `<span class="cpill ${ok ? "own" : "miss"}">${FMT[f].label}: ${ok ? "legal" : b ? "banned" : "not legal"}</span>`; }).join("");
+  const p = basePrice(i, "normal"), pf = +c[10] || 0, cheap = S.cheap?.[name]?.[0];
+  const onWish = (S.wish || []).some(w => w.name === name);
+  out.innerHTML = `<div class="lookcard">
+      <div id="lookImg"></div>
+      <div id="lookFaces">${faceHTML({ name, mana_cost:c[C.cost], type_line:c[C.type], oracle_text:c[C.text], power:/\//.test(c[C.pt]) ? c[C.pt].split("/")[0] : null, toughness:/\//.test(c[C.pt]) ? c[C.pt].split("/")[1] : null, loyalty:/\//.test(c[C.pt]) ? "" : c[C.pt] })}</div>
+      <p class="small"><span class="label">Color identity</span> ${idPips(c[C.id])}
+        ${c[C.flags] & 32 ? ` · <b>Can be your commander</b>` : ""}${c[C.flags] & 64 ? ` · <b>Game Changer</b> (counts toward the Bracket 3 limit)` : ""}${isDigital(name) ? ` · <b>Arena-only</b>` : ""}</p>
+      <div class="cpills" style="margin:6px 0">${legal}</div>
+      <p class="small"><span class="label">Price</span> ${p ? money(p) : "no price"}${pf && pf !== p ? ` · foil ${money(pf)}` : ""}${cheap ? ` · cheapest printing ${money(cheap)}` : ""}</p>
+      <p class="small"><span class="label">You own</span> ${own ? `${own} cop${own === 1 ? "y" : "ies"}${used ? ` · in ${used.decks.map(esc).join(", ")}` : ""}` : "none"}<span id="lookCombo"></span></p>
+      <div id="lookWhere"></div>
+      <p class="small muted" id="lookMeta"></p>
+      <div class="row btnrow">
+        <button id="lookWish"${onWish ? " disabled" : ""}>${onWish ? "On your wishlist" : "Add to wishlist"}</button>
+        <button id="lookAsk">Ask a rules question</button>
+        <a class="small" href="https://scryfall.com/search?q=${encodeURIComponent("!\"" + name + "\"")}" target="_blank" rel="noopener" style="align-self:center">Open on Scryfall</a>
+      </div>
+      <div id="lookRulings"><div class="progress"><div class="spin"></div><span>Getting full card text and rulings…</span></div></div>
+    </div>`;
+  $("#lookImg").append(cardGallery(c));
+  const pe = placeEditor(c); if (pe) $("#lookWhere").append(pe);
+  $("#lookWish").onclick = e => { addToWish([[name, 1]]); e.target.textContent = "On your wishlist"; e.target.disabled = true; };
+  $("#lookAsk").onclick = () => {
+    if (!S.ruleCards.includes(name) && S.ruleCards.length < 6) S.ruleCards.push(name);
+    renderRuleCards(); $("#rulingsPanel").scrollIntoView({ behavior:"smooth", block:"start" }); setTimeout(() => $("#ruleQ").focus({ preventScroll:true }), 400);
+  };
+  const token = S.lookToken = {};
+  loadCombos().then(d => { if (!d || S.lookToken !== token) return; const n = d.c.filter(r => r[1].some(k => d.map[k] === i)).length;
+    if (n) $("#lookCombo").textContent = ` · part of ${n.toLocaleString()} known combo${n === 1 ? "" : "s"}`; }).catch(() => {});
+  (async () => {
+    try {
+      const j = await getCardJSON(name);
+      if (S.lookToken !== token) return;
+      const faces = j.card_faces?.length ? j.card_faces : [j];
+      $("#lookFaces").innerHTML = faces.map(faceHTML).join("");
+      $("#lookMeta").textContent = [j.set_name && `${j.set_name}${j.rarity ? ", " + j.rarity : ""}`, j.artist && `Art by ${j.artist}`, j.released_at && `First printed ${j.released_at}`].filter(Boolean).join(" · ");
+      await sleep(100);
+      const rul = await getRulings(name);
+      if (S.lookToken !== token) return;
+      $("#lookRulings").innerHTML = rulingsHTML({ [name]: rul }).replace("<details>", "<details open>").replace(`${esc(name)} <span`, `Official rulings <span`);
+    } catch (e) {
+      if (S.lookToken === token) $("#lookRulings").innerHTML = `<p class="small muted">Couldn't reach Scryfall for the full text and rulings. What's shown above works offline.</p>`;
+    }
+  })();
+}
+attachCardSearch($("#lookCard"), $("#lookSugg"), showLookup);
 async function loadRulings(){
   const out = {};
   for (const n of S.ruleCards) { out[n] = await getRulings(n); await sleep(100); }
