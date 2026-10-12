@@ -214,6 +214,12 @@ button.mini{min-height:32px;padding:2px 10px}
 .gnav{display:flex;justify-content:center;align-items:center;gap:12px}
 .gnav button{min-width:44px;font-size:1.2rem}
 .scanvideo{width:100%;max-height:60vh;border-radius:var(--r);background:#000;display:block;object-fit:cover}
+[data-claude]::after{content:"✦";margin-left:.4em;font-weight:400;opacity:.75}
+body.nokey [data-claude]:not(h2):not(h3){opacity:.62}
+body.nokey [data-claude]::after{content:"Needs key";font-size:.66rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;border:1px solid currentColor;border-radius:999px;padding:1px 6px;display:table;margin:3px auto 0;opacity:1;white-space:nowrap;line-height:1.3}
+body.nokey h2[data-claude]::after,body.nokey h3[data-claude]::after{display:inline-block;margin:0 0 0 .5em;vertical-align:3px}
+body.nokey label[data-claude]{flex-direction:column}
+.keybar{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .scanwrap{position:relative;border-radius:var(--r);transition:box-shadow .15s}
 .scanwrap.snap{box-shadow:0 0 0 4px var(--ok)}
 .scanpill{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;font-size:.85rem;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
@@ -257,6 +263,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <p class="sub" id="dbstatus">Loading the card database…</p>
     </div>
   </header>
+  <div id="keyBar" hidden></div>
 
   <!-- COLLECTION -->
   <section id="tab-collection" class="tabpane" style="display:flex;flex-direction:column;gap:18px">
@@ -281,10 +288,10 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
     <div class="panel" id="scanPanel">
       <h2>Scan cards</h2>
       <p class="small muted">Point your camera at a card and Claude reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
-      <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
-        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <div class="row btnrow"><button class="primary" id="scanStart" data-claude>Start camera</button>
+        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer" data-claude>Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
       <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
-      <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan: snap each card by itself once it's held steady</label>
+      <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan cards when held still</label>
       <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
         <div class="scanwrap" id="scanWrap"><video id="scanVideo" class="scanvideo" playsinline muted autoplay></video><div class="scanpill" id="scanPill" hidden aria-live="polite"></div></div>
         <div class="row btnrow"><button class="primary" id="scanSnap">Scan this card</button><button class="ghost" id="scanStop">Stop camera</button></div>
@@ -382,7 +389,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
           <label class="row small" style="min-height:42px"><input type="checkbox" id="basics" checked> I have plenty of basics</label></div>
       </div>
       <label class="row small"><input type="checkbox" id="freeOnly" checked> Leave cards in my built decks alone</label>
-      <div class="row"><button class="primary grow" id="buildBtn">Build deck</button><button class="grow" id="bestCmdBtn">Find my best commanders</button></div>
+      <div class="row"><button class="primary grow" id="buildBtn" data-claude>Build deck</button><button class="grow" id="bestCmdBtn" data-claude>Find my best commanders</button></div>
       <div id="buildMsg"></div>
       <div id="bestCmdOut"></div>
     </div>
@@ -424,7 +431,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
     <div class="panel" id="preconPanel">
       <h2>Add a preconstructed deck</h2>
       <p class="small muted">Take a photo of the box, front or barcode side, or search by name. Add it as a built deck, and put its cards in your collection if you haven't scanned them yet.</p>
-      <div class="row btnrow"><label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)">Scan the box<input type="file" id="preconPhoto" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <div class="row btnrow"><label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)" data-claude>Scan the box<input type="file" id="preconPhoto" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
       <div class="field autocomplete"><label class="label" for="preconSearch">Or search by name</label><input type="text" id="preconSearch" autocomplete="off" placeholder="Deck name or set, like Eldrazi Unbound"><div class="sugg" id="preconSugg" hidden></div></div>
       <div id="preconOut"></div>
     </div>
@@ -468,7 +475,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="field autocomplete"><label class="label" for="ruleCard">Cards involved</label><input type="text" id="ruleCard" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="ruleSugg" hidden></div></div>
       <div class="chips" id="ruleCards"></div>
       <div class="field"><label class="label" for="ruleQ">Your question</label><textarea id="ruleQ" placeholder="If my opponent exiles The First Sliver with its cascade on the stack, do I still cascade?"></textarea></div>
-      <div class="row btnrow"><button class="primary" id="ruleAsk">Ask</button><button id="ruleShow">Show official rulings</button></div>
+      <div class="row btnrow"><button class="primary" id="ruleAsk" data-claude>Ask</button><button id="ruleShow">Show official rulings</button></div>
       <div id="ruleOut"></div>
     </div>
     <div class="panel"><h2>Deck records</h2><div id="records"></div></div>
@@ -1120,7 +1127,7 @@ function renderDeck(){
     <textarea id="copyArea" hidden readonly></textarea>
   </div>
   <div class="panel">
-    <div class="row" style="justify-content:space-between"><h3>Claude's take</h3><button class="${d.eval ? "ghost" : "primary"} mini" id="evalDeckBtn">${d.eval ? "Evaluate again" : "Evaluate with Claude"}</button></div>
+    <div class="row" style="justify-content:space-between"><h3>Claude's take</h3><button class="${d.eval ? "ghost" : "primary"} mini" id="evalDeckBtn" data-claude>${d.eval ? "Evaluate again" : "Evaluate with Claude"}</button></div>
     <div id="deckEval">${d.eval ? "" : `<p class="small muted">Get a rating, strengths and weaknesses, how to play it, swaps from cards you own, and the upgrades most worth buying.</p>`}</div>
   </div>
   <div class="panel">
@@ -1136,15 +1143,15 @@ function renderDeck(){
     }).join("")}
   </div>
   <div class="panel">
-    <h3>Change something</h3>
+    <h3 data-claude>Change something</h3>
     <div class="chips">${["More removal","Lower the curve","More card draw","Tighten the mana base","Make it stronger"].map(t => `<button class="chip" data-tweak="${esc(t)}">${esc(t)}</button>`).join("")}</div>
-    <div class="row"><input type="text" id="tweakInput" class="grow" placeholder="Swap the artifacts for more dragons" style="flex:1"><button id="tweakBtn" data-tweak="">Ask</button></div>
+    <div class="row"><input type="text" id="tweakInput" class="grow" placeholder="Swap the artifacts for more dragons" style="flex:1"><button id="tweakBtn" data-tweak="" data-claude>Ask</button></div>
     <div id="tweakMsg"></div>
   </div>
   <div class="panel">
     <h3>Upgrade on a budget</h3>
     <p class="small muted">Claude suggests cards to buy and what each replaces, then real Scryfall prices trim the list to your budget.</p>
-    <div class="row"><label for="budgetIn" class="label" style="margin:0">Budget $</label><input type="text" inputmode="decimal" id="budgetIn" value="${esc(d.lastBudget || "20")}" style="width:6.5em;flex:none"><button class="primary grow" id="budgetBtn">Suggest upgrades</button></div>
+    <div class="row"><label for="budgetIn" class="label" style="margin:0">Budget $</label><input type="text" inputmode="decimal" id="budgetIn" value="${esc(d.lastBudget || "20")}" style="width:6.5em;flex:none"><button class="primary grow" id="budgetBtn" data-claude>Suggest upgrades</button></div>
     <div id="budgetOut"></div>
   </div>
   <div class="panel">
@@ -1291,7 +1298,7 @@ function renderCheck(){
       <button class="grow" id="manaCheckBtn">Mana base</button>
       <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
-      <button class="primary grow" id="evalBtn">${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
+      <button class="primary grow" id="evalBtn" data-claude>${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
     <textarea id="needArea" hidden readonly></textarea>
     <div id="evalMsg"></div>
@@ -2748,7 +2755,7 @@ async function bracketPanel(box, entries, commander, fmt, deckId){
       <ul class="tight small">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
       <p class="small muted">${b === 2 ? "Could be Bracket 1 (Exhibition) if it's built purely around a theme. " : b === 4 ? "Bracket 5 (cEDH) only if it's tuned for competitive play. " : ""}Brackets are a starting point for the pre-game talk, not hard rules.</p>
       ${list("Game Changers", gc)}${list("Extra turns", extra)}${list("Mass land denial", mld)}${list("Tutors", tutors, "(no bracket limit)")}` : ""}
-      ${comboErr ? `<div class="notice warn">Couldn't check combos: ${esc(comboErr)}.${isCmd ? " The bracket above doesn't count combos." : ""}${S.sample ? ` <button class="mini" id="comboClaude">Ask Claude to look for combos</button>` : ""}</div><div id="comboClaudeOut"></div>` : ""}
+      ${comboErr ? `<div class="notice warn">Couldn't check combos: ${esc(comboErr)}.${isCmd ? " The bracket above doesn't count combos." : ""}${S.sample ? ` <button class="mini" id="comboClaude" data-claude>Ask Claude to look for combos</button>` : ""}</div><div id="comboClaudeOut"></div>` : ""}
       ${combos ? `<h3 style="margin-top:12px">Combos in this deck <span class="num muted">${combos.included.length}</span></h3>
         ${combos.included.length ? combos.included.slice(0, 40).map(v => comboHTML(v, inList)).join("") : `<p class="small muted">No known combos found.</p>`}
         ${almost.length ? `<details style="margin-top:8px"><summary>One card away <span class="num muted">${almost.length}</span></summary>${almost.slice(0, 40).map(v => comboHTML(v, inList)).join("")}</details>` : ""}
@@ -3286,7 +3293,14 @@ function makeSampler(key){
   sample.limits = async () => ({ tools:{ maxCount:8 } });
   return sample;
 }
-function initClaude(){ const k = getKey(); S.sample = k ? makeSampler(k) : null; S.toolsOK = !!k; }
+function initClaude(){ const k = getKey(); S.sample = k ? makeSampler(k) : null; S.toolsOK = !!k; document.body.classList.toggle("nokey", !k); renderKeyBar(); }
+function renderKeyBar(){
+  const bar = $("#keyBar"); if (!bar) return;
+  bar.hidden = !!S.sample || LS.get("dw.keybarX") === true;
+  bar.innerHTML = `<div class="notice keybar"><span class="small">No Claude key yet. Your collection, prices, checks and lookups all work. Things marked <b>✦ Needs key</b> use Claude.</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="mini primary" id="keyBarGo">Add key</button><button class="ghost mini" id="keyBarX" aria-label="Hide this">✕</button></span></div>`;
+  $("#keyBarGo").onclick = () => showTab("settings");
+  $("#keyBarX").onclick = () => { LS.set("dw.keybarX", true); bar.hidden = true; };
+}
 function showKeyNeeded(sel){
   const b = $(sel); if (!b) return;
   b.hidden = false;
@@ -3299,7 +3313,7 @@ function renderSettings(){
   const k = getKey();
   $("#keyState").innerHTML = k
     ? `<div class="notice ok">Key saved on this device (ends in …${esc(k.slice(-4))}).</div>`
-    : `<div class="notice warn">No key yet. Your collection, the Check tab and shopping lists all work without one.</div>`;
+    : `<div class="notice warn">No key yet. Your collection, prices, the Check tab, card lookup, combos and test draws all work without one. Buttons marked ✦ use Claude and show <b>Needs key</b> until you add one.</div>`;
   const m = window.MTG_DB?.meta || {};
   if ($("#comboDataInfo")) $("#comboDataInfo").textContent = COMBOS ? `${COMBOS.c.length.toLocaleString()} combos from Commander Spellbook${COMBOS.t ? ", updated " + String(COMBOS.t).slice(0, 10) : ""}.` : combosTried ? "No combo data yet. Run the GitHub job below once." : "";
   $("#cardDataInfo").textContent = S.cards.length
