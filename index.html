@@ -235,6 +235,8 @@ button.mini{min-height:32px;padding:2px 10px}
 .vers:last-child{border-bottom:0}
 .opp{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
 .syncbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:9}
+.precon{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;width:100%;background:none;border-left:0;border-right:0;border-top:0;border-radius:0;min-height:0}
+.precon:last-child{border-bottom:0}
 ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
@@ -412,6 +414,13 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <!-- DECKS -->
   <section id="tab-decks" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
     <div id="sharedBox"></div>
+    <div class="panel" id="preconPanel">
+      <h2>Add a preconstructed deck</h2>
+      <p class="small muted">Take a photo of the box, front or barcode side, or search by name. Add it as a built deck, and put its cards in your collection if you haven't scanned them yet.</p>
+      <div class="row btnrow"><label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)">Scan the box<input type="file" id="preconPhoto" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <div class="field autocomplete"><label class="label" for="preconSearch">Or search by name</label><input type="text" id="preconSearch" autocomplete="off" placeholder="Deck name or set, like Eldrazi Unbound"><div class="sugg" id="preconSugg" hidden></div></div>
+      <div id="preconOut"></div>
+    </div>
     <div class="panel"><h2>Saved decks</h2><div id="savedList"></div></div>
   </section>
 
@@ -684,7 +693,7 @@ function restoreLocal(){
   S.decks = LS.get("dw.decks") || [];
   S.prints = LS.get("dw.prints") || []; indexPrints();
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
-  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || []; S.loc = LS.get("dw.loc") || {}; S.scan = LS.get("dw.scan") || [];
+  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || []; S.upc = LS.get("dw.upc") || {}; S.loc = LS.get("dw.loc") || {}; S.scan = LS.get("dw.scan") || [];
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -1493,7 +1502,7 @@ function deckFromCards(name, cmap, opts = {}){
     opts:{ fmt, power:"focused", theme:"", depth:"default", basicsUnlimited:true, colors:"", freeOnly:true },
     createdAt: existing?.createdAt || Date.now(), saved:true, built: existing ? existing.built : !!opts.built, source: opts.source || "" };
   d.versions = existing?.versions || [];
-  d._note = { manabox:"Imported from ManaBox", check:"Saved from the Check tab", shared:"Shared with you" }[opts.source] || "First saved";
+  d._note = { manabox:"Imported from ManaBox", check:"Saved from the Check tab", shared:"Shared with you", precon:"Added preconstructed deck" }[opts.source] || "First saved";
   recordVersion(d);
   S.decks = [d, ...S.decks.filter(x => x.id !== d.id)];
   LS.set("dw.decks", S.decks);
@@ -1893,6 +1902,118 @@ function renderRecords(){
   };
 }
 
+/* ================= preconstructed decks ================= */
+// precons.json is built weekly from MTGJSON's deck files. Barcodes aren't in any free data source,
+// so the app reads the box with Claude and remembers each barcode once you confirm which deck it is.
+let PRECONS = null, preconsLoading = null;
+function loadPrecons(){
+  if (!preconsLoading) preconsLoading = (async () => {      // one shared load, so early callers wait for it
+    try {
+      const r = await fetch("precons.json"); if (!r.ok) return null;
+      const d = await r.json();
+      d.key = d.d.map(x => (x[0] + " " + x[1] + " " + x[2]).toLowerCase());
+      PRECONS = d;
+    } catch (e) { console.warn("no precon data", e); }
+    return PRECONS;
+  })();
+  return preconsLoading;
+}
+const preconId = x => x[0] + "|" + x[1];
+function preconSearch(q, limit = 8){
+  const words = String(q || "").toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(w => w.length > 1 && !["the","of","deck","commander","magic","gathering","and","mtg"].includes(w));
+  if (!words.length || !PRECONS) return [];
+  return PRECONS.d.map((x, k) => {
+    const key = PRECONS.key[k], nm = x[0].toLowerCase();
+    let s = 0; for (const w of words) { if (nm.split(/\s+/).includes(w)) s += 3; else if (key.includes(w)) s += 1; }
+    if (nm === words.join(" ")) s += 10;
+    return [k, s];
+  }).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1] || PRECONS.d[b[0]][3].localeCompare(PRECONS.d[a[0]][3])).slice(0, limit).map(([k]) => k);
+}
+const preconMeta = x => `${esc(x[1])} · ${esc(String(x[3]).slice(0, 4))} · ${esc(x[2])}`;
+function preconPick(list, note){
+  const out = $("#preconOut");
+  if (!list.length) { out.innerHTML = `<div class="notice warn">${note || "No preconstructed deck matched."} Try searching by name.</div>`; return; }
+  out.innerHTML = (note ? `<p class="small" style="margin-top:8px">${note}</p>` : "") + `<div>${list.map(k => { const x = PRECONS.d[k];
+    return `<button class="precon" data-pk="${k}"><b>${esc(x[0])}</b><span class="small muted">${preconMeta(x)}${x[4].length ? " · " + esc(PRECONS.n[x[4][0][0]]) : ""}</span></button>`; }).join("")}</div>`;
+  out.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => showPrecon(+b.dataset.pk, S.pendingUpc));
+}
+function showPrecon(k, upc){
+  const x = PRECONS.d[k], [name, code, type, date, cmd, main, side] = x;
+  if (upc) { S.upc = S.upc || {}; S.upc[upc] = preconId(x); LS.set("dw.upc", S.upc); S.pendingUpc = null; }
+  const rows = arr => arr.map(([ni, c, set, num, foil]) => ({ name:PRECONS.n[ni], c, set, num, foil, i:lookup(PRECONS.n[ni]) }));
+  const C1 = rows(cmd), M = rows(main), SB = rows(side), all = [...C1, ...M, ...SB];
+  const count = arr => arr.reduce((a, r) => a + r.c, 0);
+  const value = all.reduce((a, r) => a + (r.i >= 0 ? r.c * basePrice(r.i, r.foil ? "foil" : "normal") : 0), 0);
+  const unknown = all.filter(r => r.i < 0);
+  const already = S.decks.find(d => d.source === "precon" && d.name === name);
+  $("#preconOut").innerHTML = `<div style="margin-top:10px"><span class="label">${preconMeta(x)}</span><h3>${esc(name)}</h3>
+    <p class="small">${C1.length ? `Commander: <b>${esc(C1.map(r => r.name).join(" and "))}</b> · ` : ""}${count(C1) + count(M)} cards${SB.length ? ` plus ${count(SB)} extra` : ""} · worth about <b class="price">${money(value)}</b></p>
+    ${already ? `<div class="notice warn">You already have a saved deck called ${esc(name)}. Adding it again makes a second copy.</div>` : ""}
+    ${unknown.length ? `<p class="small muted">${unknown.length} card${unknown.length === 1 ? "" : "s"} not in the app's card list yet: ${esc(unknown.slice(0, 5).map(r => r.name).join(", "))}.</p>` : ""}
+    <details><summary class="small">See the cards</summary><p class="small" style="margin-top:6px">${[...C1, ...M].map(r => `${r.c > 1 ? r.c + " " : ""}${esc(r.name)}${r.foil ? " ✦" : ""}`).join(", ")}${SB.length ? `<br><span class="muted">Extra: ${SB.map(r => esc(r.name)).join(", ")}</span>` : ""}</p></details>
+    <label class="row small" style="margin-top:8px"><input type="checkbox" id="pcBuilt" checked> It's built (sleeved up and in use)</label>
+    <label class="row small"><input type="checkbox" id="pcColl" checked> Add its cards to my collection (untick if you've already scanned them in)</label>
+    <div class="row btnrow" style="margin-top:8px"><button class="primary" id="pcAdd">Add this deck</button><button class="ghost" id="pcBack">Back</button></div></div>`;
+  $("#pcBack").onclick = () => { $("#preconOut").innerHTML = ""; };
+  $("#pcAdd").onclick = async () => {
+    const cmap = new Map();
+    for (const r of [...C1, ...M]) if (r.i >= 0) cmap.set(r.i, (cmap.get(r.i) || 0) + r.c);
+    const cmdIdx = C1.length && C1[0].i >= 0 ? C1[0].i : null;
+    const d = deckFromCards(name, cmap, { fmt: cmdIdx != null ? "commander" : "casual", cmd:cmdIdx, source:"precon", built:$("#pcBuilt").checked });
+    d.summary = `${type} from ${code}, released ${date}.`; LS.set("dw.decks", S.decks);
+    if ($("#pcColl").checked) {
+      const prints = [];
+      for (const r of all) { if (r.i < 0) continue; S.coll.set(r.i, (S.coll.get(r.i) || 0) + r.c); if (r.set && r.num) prints.push({ id:"", set:r.set, cn:r.num, finish:r.foil ? "foil" : "normal", name:card(r.i)[C.name], qty:r.c }); }
+      S.prints = mergePrints(S.prints || [], prints); savePrints(); S.updatedAt = Date.now(); await persistCollection();
+    }
+    renderAll();
+    $("#preconOut").innerHTML = `<div class="notice ok">Added <b>${esc(name)}</b>${$("#pcBuilt")?.checked !== false ? "" : ""}. <button class="mini" id="pcOpen">Open it</button></div>`;
+    $("#pcOpen").onclick = () => { S.current = d; showTab("build"); renderDeck(); };
+  };
+}
+const preconInput = $("#preconSearch"), preconSugg = $("#preconSugg");
+preconInput.addEventListener("focus", () => loadPrecons());
+preconInput.addEventListener("input", async () => {
+  const d = await loadPrecons();
+  if (!d) { preconSugg.hidden = true; $("#preconOut").innerHTML = `<div class="notice warn">The preconstructed deck lists aren't in your app yet. Run the <b>Update card and combo data</b> job on GitHub once (see Settings, Card data).</div>`; return; }
+  const hits = preconSearch(preconInput.value);
+  preconSugg.innerHTML = hits.length ? hits.map(k => `<button type="button" data-pk="${k}">${esc(d.d[k][0])} <span class="muted small">${preconMeta(d.d[k])}</span></button>`).join("") : `<div class="small muted" style="padding:10px 12px">No deck matches yet.</div>`;
+  preconSugg.hidden = preconInput.value.trim().length < 2;
+  preconSugg.querySelectorAll("button").forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { preconSugg.hidden = true; showPrecon(+b.dataset.pk, S.pendingUpc); }; });
+});
+preconInput.addEventListener("blur", () => setTimeout(() => { preconSugg.hidden = true; }, 200));
+$("#preconPhoto").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const out = $("#preconOut");
+  const d = await loadPrecons();
+  if (!d) { out.innerHTML = `<div class="notice warn">The preconstructed deck lists aren't in your app yet. Run the <b>Update card and combo data</b> job on GitHub once (see Settings, Card data).</div>`; return; }
+  out.innerHTML = `<div class="progress" style="margin-top:10px"><div class="spin"></div><span>Reading the box…</span></div>`;
+  let bmp; try { bmp = await createImageBitmap(f); } catch { out.innerHTML = `<div class="notice bad">That photo couldn't be opened.</div>`; return; }
+  let upc = null;
+  if ("BarcodeDetector" in window) {
+    try { const codes = await new BarcodeDetector({ formats:["ean_13","upc_a","upc_e","ean_8"] }).detect(bmp); upc = codes[0]?.rawValue || null; } catch {}
+  }
+  S.upc = S.upc || LS.get("dw.upc") || {};
+  if (upc && S.upc[upc]) { const k = d.d.findIndex(x => preconId(x) === S.upc[upc]); if (k >= 0) { showPrecon(k, null); return; } }
+  if (!S.sample) {
+    S.pendingUpc = upc;
+    out.innerHTML = `<div class="notice warn">${upc ? `Found barcode ${esc(upc)}, but it isn't linked to a deck yet. Search for the deck by name below and the app will remember this barcode.` : "Reading the box needs your Anthropic API key (Settings). You can search by name instead."}</div>`;
+    return;
+  }
+  try {
+    const r = await S.sample.json(`This photo shows the box or packaging of a Magic: The Gathering product, most likely a preconstructed deck (Commander deck, Challenger deck, Starter kit, Planeswalker deck and so on). Read what's printed on it.
+Reply with only JSON: {"deck":"the deck's own name, like Eldrazi Unbound","product":"the product line, like Commander Masters Commander Deck","set":"the set or expansion name if shown","barcode":"the barcode digits if readable"}
+Use "" for anything you can't read.`, { modelTier:"default", cache:false, images:[{ media_type:"image/jpeg", data:frameToJpeg(bmp, bmp.width, bmp.height) }] });
+    upc = upc || (String(r?.barcode || "").replace(/\D/g, "") || null);
+    if (upc && S.upc[upc]) { const k = d.d.findIndex(x => preconId(x) === S.upc[upc]); if (k >= 0) { showPrecon(k, null); return; } }
+    S.pendingUpc = upc;
+    let hits = preconSearch(r?.deck || "", 6);
+    if (!hits.length) hits = preconSearch([r?.deck, r?.product, r?.set].filter(Boolean).join(" "), 6);
+    const read = [r?.deck, r?.product].filter(Boolean).join(", ");
+    preconPick(hits, read ? `The box says <b>${esc(read)}</b>. Pick the right deck:` : "Couldn't read a deck name from that photo.");
+  } catch (err) { out.innerHTML = `<div class="notice bad">${esc(errText(err))}</div>`; }
+});
+
 /* ================= camera scanning ================= */
 let scanStream = null, scanBusy = 0;
 function stopScan(){ if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const cam = $("#scanCam"); if (cam) cam.hidden = true; const st = $("#scanStart"); if (st) st.hidden = false; }
@@ -2246,7 +2367,7 @@ $("#gnGo").onclick = () => {
 };
 
 /* ================= sync through a private GitHub Gist ================= */
-const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn"];
+const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn","dw.upc"];
 const SYNC_FILE = "deckwright-sync.json", GH = "https://api.github.com";
 const syncCfg = () => { try { return JSON.parse(localStorage.getItem("dw.sync")) || {}; } catch { return {}; } };
 const saveSyncCfg = c => { try { localStorage.setItem("dw.sync", JSON.stringify(c)); } catch {} };
@@ -2363,17 +2484,19 @@ function attachCardSearch(input, box, onPick){
 const CSB = "https://backend.commanderspellbook.com";
 // Combos are matched on the device against combos.json, which the weekly GitHub job builds from
 // Commander Spellbook's published export (their server doesn't accept calls from other sites).
-let COMBOS = null, combosTried = false;
-async function loadCombos(){
-  if (COMBOS || combosTried) return COMBOS;
-  combosTried = true;
-  try {
-    const r = await fetch("combos.json"); if (!r.ok) return null;
-    const d = await r.json();
-    d.map = d.n.map(n => lookup(n));                      // their card names -> our card list
-    COMBOS = d; renderSettings();
-  } catch (e) { console.warn("no combo data", e); }
-  return COMBOS;
+let COMBOS = null, combosTried = false, combosLoading = null;
+function loadCombos(){
+  if (!combosLoading) combosLoading = (async () => {
+    try {
+      const r = await fetch("combos.json"); if (!r.ok) return null;
+      const d = await r.json();
+      d.map = d.n.map(n => lookup(n));                      // their card names -> our card list
+      COMBOS = d;
+    } catch (e) { console.warn("no combo data", e); }
+    finally { combosTried = true; renderSettings(); }
+    return COMBOS;
+  })();
+  return combosLoading;
 }
 function comboObj(row, d){
   const [id, cards, prod, pop, req, ident, mana] = row;

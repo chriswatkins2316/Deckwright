@@ -1,5 +1,5 @@
 // Deckwright offline support. Bump VERSION whenever any app file changes.
-const VERSION = "deckwright-v12";
+const VERSION = "deckwright-v13";
 const FONTS = "deckwright-fonts";
 const SHELL = ["./", "index.html", "cards.js", "manifest.webmanifest",
   "qrcode.js", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];
@@ -35,7 +35,7 @@ self.addEventListener("fetch", e => {
       );
       return;
     }
-    if (/\/(cards\.js|combos\.json)$/.test(url.pathname)) {
+    if (/\/(cards\.js|combos\.json|precons\.json)$/.test(url.pathname)) {
       // data the weekly GitHub job refreshes: answer from the cache at once, fetch the newest copy for next time
       e.respondWith(caches.open(VERSION).then(async c => {
         const hit = await c.match(req, { ignoreSearch: true });
