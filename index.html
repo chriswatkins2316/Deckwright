@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Build Magic: The Gathering decks from the cards you own.">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="qrcode.js" defer></script>
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*,*::before,*::after{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
@@ -180,6 +181,25 @@ button.mini{min-height:32px;padding:2px 10px}
 .upg.over{opacity:.55}
 .pick5{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid var(--line)}
 .pick5:last-child{border-bottom:0}
+.btnrow > button{flex:1 1 140px}
+.combo{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}
+.combo:last-child{border-bottom:0}
+.cpills{display:flex;flex-wrap:wrap;gap:4px}
+.cpill{font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:var(--bg)}
+.cpill.own{border-color:var(--ok)}
+.cpill.miss{border-color:var(--bad);border-style:dashed}
+.bracket{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.bracket .bignum{color:var(--accent)}
+.setrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer;width:100%}
+.setrow:focus-visible{outline:2px solid var(--accent)}
+.setrow .meter{grid-column:1/-1;height:6px}
+.wish{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
+.wish:last-child{border-bottom:0}
+.wish input{width:5.5em;padding:6px 8px}
+.wish .hit{color:var(--ok);font-weight:600}
+.qrbox{background:#fff;padding:10px;border-radius:8px;width:min(260px,100%);margin:0 auto}
+.qrbox svg{display:block;width:100%;height:auto}
+.answer{white-space:pre-wrap;line-height:1.55}
 ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
@@ -230,6 +250,24 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
         <div class="field"><span class="label">Keep</span><label class="row small" style="min-height:42px"><input type="checkbox" id="tradeKeep" checked> One copy of everything</label></div>
       </div>
       <div id="tradeOut"></div>
+    </div>
+    <div class="panel" id="wishPanel" hidden>
+      <h2>Wishlist</h2>
+      <p class="small muted">Cards you want, with the price you'd pay. Refreshing prices shows which have dropped to your target.</p>
+      <div class="field autocomplete"><label class="label" for="wishAdd">Add a card</label><input type="text" id="wishAdd" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="wishSugg" hidden></div></div>
+      <div id="wishOut"></div>
+    </div>
+    <div class="panel" id="comboPanel" hidden>
+      <h2>Combos in your collection</h2>
+      <p class="small muted">Searches Commander Spellbook's combo database for combos you can put together from your cards, and ones you're a single card away from.</p>
+      <div class="row"><button class="grow" id="comboBtn">Find my combos</button></div>
+      <div id="comboOut"></div>
+    </div>
+    <div class="panel" id="setsPanel" hidden>
+      <h2>Set completion</h2>
+      <p class="small muted">How much of each set you own, counting the exact printings from your ManaBox import. Tap a set to see what's missing and what it costs.</p>
+      <div class="row"><button class="grow" id="setsBtn">Show my sets</button></div>
+      <div id="setsOut"></div>
     </div>
   </section>
 
@@ -317,6 +355,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 
   <!-- DECKS -->
   <section id="tab-decks" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div id="sharedBox"></div>
     <div class="panel"><h2>Saved decks</h2><div id="savedList"></div></div>
   </section>
 
@@ -337,6 +376,15 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="lifegrid" id="lifeGrid"></div>
       <div class="row"><button class="grow" id="lifeReset">New game</button><button class="primary grow" id="lifeWin">Record winner</button></div>
       <div id="lifeMsg"></div>
+    </div>
+    <div class="panel">
+      <h2>Rulings</h2>
+      <p class="small muted">Ask how cards work, alone or together. Answers use each card's rules text and its official rulings from Scryfall.</p>
+      <div class="field autocomplete"><label class="label" for="ruleCard">Cards involved</label><input type="text" id="ruleCard" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="ruleSugg" hidden></div></div>
+      <div class="chips" id="ruleCards"></div>
+      <div class="field"><label class="label" for="ruleQ">Your question</label><textarea id="ruleQ" placeholder="If my opponent exiles The First Sliver with its cascade on the stack, do I still cascade?"></textarea></div>
+      <div class="row btnrow"><button class="primary" id="ruleAsk">Ask</button><button id="ruleShow">Show official rulings</button></div>
+      <div id="ruleOut"></div>
     </div>
     <div class="panel"><h2>Deck records</h2><div id="records"></div></div>
   </section>
@@ -416,6 +464,7 @@ function loadDB(){
     $("#dbstatus").textContent = `${S.cards.length.toLocaleString()} cards${m.source ? " from " + m.source : ""}${m.date ? " (" + m.date + ")" : ""} · works offline`;
     restoreLocal();
     renderAll();
+    handleSharedLink();
   };
   s.onerror = () => { $("#dbstatus").textContent = "The card database didn't load. Reload the page to try again."; };
   document.body.appendChild(s);
@@ -549,7 +598,7 @@ function restoreLocal(){
   S.decks = LS.get("dw.decks") || [];
   S.prints = LS.get("dw.prints") || []; indexPrints();
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
-  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null;
+  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || [];
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -630,7 +679,7 @@ function renderCollection(){
   bindCardRows($("#collList"));
   $("#collMore").innerHTML = rows.length > S.shown ? `<button id="moreBtn" class="grow">Show more (${(rows.length - S.shown).toLocaleString()} left)</button>` : `<span class="small muted">${rows.length.toLocaleString()} shown</span>`;
   if ($("#moreBtn")) $("#moreBtn").onclick = () => { S.shown += 200; renderCollection(); };
-  renderTrade();
+  renderTrade(); renderWish(); $("#comboPanel").hidden = false; $("#setsPanel").hidden = !(S.prints || []).length;
 }
 function cardRow(i, qty, role, price){
   const c = card(i);
@@ -957,11 +1006,25 @@ function renderDeck(){
     <p class="small muted">Claude suggests cards to buy and what each replaces, then real Scryfall prices trim the list to your budget.</p>
     <div class="row"><label for="budgetIn" class="label" style="margin:0">Budget $</label><input type="text" inputmode="decimal" id="budgetIn" value="${esc(d.lastBudget || "20")}" style="width:6.5em;flex:none"><button class="primary grow" id="budgetBtn">Suggest upgrades</button></div>
     <div id="budgetOut"></div>
+  </div>
+  <div class="panel">
+    <h3>${d.format === "commander" ? "Bracket and combos" : "Combos"}</h3>
+    <p class="small muted">${d.format === "commander" ? "Estimates the Commander bracket from Game Changers, mass land denial, extra turns and two-card combos, and lists the combos in this deck." : "Lists the combos in this deck and ones it's one card away from."}</p>
+    <div class="row"><button class="grow" id="deckBracketBtn">${d.format === "commander" ? "Check bracket and combos" : "Find combos"}</button></div>
+    <div id="deckBracket"></div>
+  </div>
+  <div class="panel">
+    <h3>Share</h3>
+    <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button></div>
+    <div id="shareOut"></div>
   </div>`;
   bindCardRows(view);
   $("#deckBuilt").onchange = e => setBuilt(d, e.target.checked);
   $("#renameBtn").onclick = () => renameDeck(d);
   $("#budgetBtn").onclick = () => budgetUpgrade(d);
+  $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
+  $("#shareBtn").onclick = () => shareDeck(d);
+  $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
   $("#saveDeckBtn").onclick = async () => { await saveDeck(S.current); $("#saveDeckBtn").textContent = "Saved"; };
   $("#copyBtn").onclick = () => {
     const t = deckText(d);
@@ -1066,13 +1129,16 @@ function renderCheck(){
     ${k.digital?.length ? `<div class="notice">${k.digital.length} Arena-only card${k.digital.length > 1 ? "s" : ""} with no paper version ${k.digital.length > 1 ? "were" : "was"} left out: ${esc(k.digital.map(([n]) => n).join(", "))}. Swap in paper cards that do the same job.</div>` : ""}
     ${k.unknown.length ? `<div class="notice warn">${k.unknown.length} line${k.unknown.length>1?"s":""} didn't match a card and ${k.unknown.length>1?"were":"was"} skipped: ${esc(k.unknown.slice(0,8).map(([n]) => n).join(", "))}${k.unknown.length>8?" …":""}</div>` : ""}
     ${k.issues.length ? `<div class="notice bad"><b>Rules problems</b><br>${k.issues.slice(0,12).map(esc).join("<br>")}${k.issues.length>12?"<br>…":""}</div>` : `<div class="notice ok">No rules problems for ${esc(FMT[k.fmt].label)}.</div>`}
-    <div class="row">
+    <div class="row btnrow">
       ${missing.length ? `<button class="grow" id="copyNeedBtn">Copy shopping list</button>` : ""}
+      ${missing.length ? `<button class="grow" id="wishCheckBtn">Add missing to wishlist</button>` : ""}
+      <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
       <button class="primary grow" id="evalBtn">${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
     <textarea id="needArea" hidden readonly></textarea>
     <div id="evalMsg"></div>
+    <div id="checkBracket"></div>
   </div>
   <div class="panel" id="evalProgress" hidden><div class="progress"><div class="spin"></div><div class="grow"><b>Claude is reviewing the deck</b><div class="stream" id="evalStream"></div></div><button class="ghost" id="evalStop">Stop</button></div></div>
   ${ev ? evalHTML(ev) : ""}
@@ -1091,6 +1157,8 @@ function renderCheck(){
   };
   $("#evalBtn").onclick = evaluateDeck;
   $("#saveCheckBtn").onclick = saveCheckAsDeck;
+  if ($("#wishCheckBtn")) $("#wishCheckBtn").onclick = () => { const n = addToWish(missing.map(r => [card(r.i)[C.name], r.missing])); $("#evalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist on the Collection tab.</div>`; };
+  $("#bracketCheckBtn").onclick = () => { const cmd = k.commanders.length ? card(k.commanders[0])[C.name] : null; bracketPanel($("#checkBracket"), k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]), cmd, k.fmt, null); };
   if (!S.sample) $("#evalBtn").onclick = () => showKeyNeeded("#evalMsg");
   if ($("#useSubsBtn")) $("#useSubsBtn").onclick = buildFromCheck;
 }
@@ -1691,6 +1759,365 @@ function renderRecords(){
   };
 }
 
+/* ---------- shared helpers ---------- */
+function copyText(t, btn, fallbackBox){
+  const label = btn?.textContent;
+  navigator.clipboard?.writeText(t).then(() => { if (btn) { btn.textContent = "Copied"; setTimeout(() => { if (btn.isConnected) btn.textContent = label; }, 1800); } })
+    .catch(() => { if (fallbackBox) { fallbackBox.innerHTML = `<textarea readonly style="min-height:140px">${esc(t)}</textarea>`; const a = fallbackBox.querySelector("textarea"); a.focus(); a.select(); } });
+}
+function attachCardSearch(input, box, onPick){
+  input.addEventListener("input", () => {
+    const q = norm(input.value); if (q.length < 2 || !S.normNames) { box.hidden = true; return; }
+    const hits = [];
+    for (let i = 0; i < S.normNames.length && hits.length < 10; i++) if (S.normNames[i].startsWith(q)) hits.push(i);
+    for (let i = 0; i < S.normNames.length && hits.length < 10; i++) if (!hits.includes(i) && S.normNames[i].includes(q)) hits.push(i);
+    box.innerHTML = hits.length ? hits.map(i => `<button type="button" data-i="${i}">${esc(card(i)[C.name])}</button>`).join("") : `<div class="small muted" style="padding:10px 12px">No card matches.</div>`;
+    box.hidden = false;
+    box.querySelectorAll("button").forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { box.hidden = true; input.value = ""; onPick(+b.dataset.i); }; });
+  });
+  input.addEventListener("blur", () => setTimeout(() => { box.hidden = true; }, 200));
+}
+
+/* ---------- combos (Commander Spellbook) ---------- */
+const CSB = "https://backend.commanderspellbook.com";
+async function csbFindCombos(main, commanders){
+  const body = JSON.stringify({ main: main.map(([n, q]) => ({ card:n, quantity:q })), commanders: (commanders || []).map(n => ({ card:n, quantity:1 })) });
+  const out = { included:[], almostIncluded:[] };
+  let url = CSB + "/find-my-combos?limit=250", pages = 0;
+  while (url && pages < 4) {
+    let r;
+    for (let k = 0; ; k++) {
+      try { r = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body }); }
+      catch (e) { if (k < 2) { await sleep(1500 * (k + 1)); continue; } throw Object.assign(new Error("Commander Spellbook didn't answer"), { code:"network" }); }
+      if ((r.status === 429 || r.status >= 500) && k < 2) { await sleep(3000 * (k + 1)); continue; }
+      break;
+    }
+    if (!r.ok) throw Object.assign(new Error("Commander Spellbook answered " + r.status), { code:"server" });
+    const j = await r.json(), res = j.results || {};
+    out.included.push(...(res.included || [])); out.almostIncluded.push(...(res.almostIncluded || []));
+    url = j.next; pages++;
+    if (url) await sleep(800);
+  }
+  return out;
+}
+const comboCards = v => (v.uses || []).map(u => u.card?.name).filter(Boolean);
+const comboTemplates = v => (v.requires || []).map(t => t.template?.name).filter(Boolean);
+function comboHTML(v, inList){
+  const cards = comboCards(v), extra = comboTemplates(v);
+  const prod = (v.produces || []).map(p => p.feature?.name).filter(Boolean).slice(0, 3).join(" · ");
+  return `<div class="combo">
+    <div class="cpills">${cards.map(n => { const have = inList(n), i = lookup(n);
+      return `<span class="cpill ${have ? "own" : "miss"}">${esc(n)}${have ? "" : ` · need${i >= 0 ? " " + money(buyPrice(i)) : ""}`}</span>`; }).join("")}${extra.map(t => `<span class="cpill">+ ${esc(t)}</span>`).join("")}</div>
+    ${prod ? `<span class="small">${esc(prod)}</span>` : ""}
+    <details><summary class="small">How it works</summary>
+      ${v.easyPrerequisites ? `<p class="small muted" style="white-space:pre-wrap">${esc(v.easyPrerequisites)}</p>` : ""}
+      ${v.notablePrerequisites ? `<p class="small" style="white-space:pre-wrap">${esc(v.notablePrerequisites)}</p>` : ""}
+      <p class="small" style="white-space:pre-wrap">${esc(v.description || "")}</p>
+      ${v.manaNeeded ? `<p class="small muted">Mana needed: ${pips(v.manaNeeded)}</p>` : ""}
+      <a class="small" href="https://commanderspellbook.com/combo/${encodeURIComponent(v.id)}/" target="_blank" rel="noopener">Open on Commander Spellbook</a>
+    </details></div>`;
+}
+const isTwoCard = v => comboCards(v).length <= 2 && !comboTemplates(v).length;
+
+/* ---------- bracket checker ---------- */
+const RX_EXTRA = /\bextra turn/i, RX_NOEXTRA = /can't take extra turns/i;
+const RX_MLD = /\b(destroy|exile) all (nonbasic )?lands\b|\bsacrifices? all lands\b|\beach player sacrifices (?:x |two |three |four |five |six |that many |half the )?lands\b|\blands (?:you control |your opponents control )?don't untap\b|\bdestroy each land\b|\breturn all lands\b|\ball lands are no longer\b/i;
+const RX_TUTOR = /search(?:es)? (?:your|their) library for (?:a|an|up to (?:one|two|three)) (?![^.]*\b(?:basic|land)\b)[^.]*?cards?\b/i;
+async function bracketPanel(box, entries, commander, fmt, deckId){
+  const isCmd = fmt === "commander";
+  const all = [...entries, ...(commander ? [[commander, 1]] : [])];
+  const idx = all.map(([n, q]) => [lookup(n), q]).filter(([i]) => i >= 0);
+  const names = list => [...new Set(list.map(([i]) => card(i)[C.name]))];
+  const gc = names(idx.filter(([i]) => card(i)[C.flags] & 64));
+  const extra = names(idx.filter(([i]) => RX_EXTRA.test(card(i)[C.text]) && !RX_NOEXTRA.test(card(i)[C.text])));
+  const mld = names(idx.filter(([i]) => RX_MLD.test(card(i)[C.text])));
+  const tutors = names(idx.filter(([i]) => RX_TUTOR.test(card(i)[C.text])));
+  const inDeck = new Set(all.map(([n]) => n));
+  const inList = n => inDeck.has(n) || [...inDeck].some(x => x.split(" // ")[0] === n);
+  const ownIt = n => { const i = lookup(n); return i >= 0 && (S.coll.get(i) || 0) > 0; };
+  const draw = (combos, comboErr) => {
+    const two = combos ? combos.included.filter(isTwoCard) : [];
+    let b = 0; const why = [];
+    if (isCmd) {
+      if (gc.length > 3) { b = 4; why.push(`${gc.length} Game Changers. Bracket 3 allows up to 3.`); }
+      if (mld.length) { b = Math.max(b, 4); why.push(`Mass land denial (${mld.join(", ")}) is a Bracket 4 trait.`); }
+      if (two.length) { b = Math.max(b, 3); why.push(`${two.length} two-card combo${two.length > 1 ? "s" : ""}. Fine in Bracket 3 only if it can't win before about turn 6. A cheap, early one makes it Bracket 4.`); }
+      if (!b && gc.length) { b = 3; why.push(`${gc.length} Game Changer${gc.length > 1 ? "s" : ""}, within Bracket 3's limit of 3.`); }
+      if (extra.length >= 3 && b < 3) { b = 3; why.push(`${extra.length} extra-turn cards, enough to start chaining turns.`); }
+      if (!b) { b = 2; why.push("No Game Changers, mass land denial or two-card combos."); }
+    }
+    const label = { 2:"Core", 3:"Upgraded", 4:"Optimized" }[b];
+    const list = (title, arr, note) => arr.length ? `<p class="small"><span class="label">${title}</span> ${esc(arr.join(", "))}${note ? ` <span class="muted">${note}</span>` : ""}</p>` : "";
+    const almost = combos ? combos.almostIncluded.slice().sort((a, b2) => (ownIt(comboCards(a).find(n => !inList(n)) || "") ? 0 : 1) - (ownIt(comboCards(b2).find(n => !inList(n)) || "") ? 0 : 1)) : [];
+    box.innerHTML = `${isCmd ? `<div class="bracket" style="margin-top:10px"><span class="label">Estimated bracket</span><span class="bignum">${b}</span><b>${label}</b></div>
+      <ul class="tight small">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
+      <p class="small muted">${b === 2 ? "Could be Bracket 1 (Exhibition) if it's built purely around a theme. " : b === 4 ? "Bracket 5 (cEDH) only if it's tuned for competitive play. " : ""}Brackets are a starting point for the pre-game talk, not hard rules.</p>
+      ${list("Game Changers", gc)}${list("Extra turns", extra)}${list("Mass land denial", mld)}${list("Tutors", tutors, "(no bracket limit)")}` : ""}
+      ${comboErr ? `<div class="notice warn">Couldn't reach Commander Spellbook (${esc(comboErr)}).${isCmd ? " The bracket above doesn't count combos." : ""}${S.sample ? ` <button class="mini" id="comboClaude">Ask Claude to look for combos</button>` : ""}</div><div id="comboClaudeOut"></div>` : ""}
+      ${combos ? `<h3 style="margin-top:12px">Combos in this deck <span class="num muted">${combos.included.length}</span></h3>
+        ${combos.included.length ? combos.included.slice(0, 40).map(v => comboHTML(v, inList)).join("") : `<p class="small muted">No known combos found.</p>`}
+        ${almost.length ? `<details style="margin-top:8px"><summary>One card away <span class="num muted">${almost.length}</span></summary>${almost.slice(0, 40).map(v => comboHTML(v, inList)).join("")}</details>` : ""}
+        <p class="small muted" style="margin-top:6px">Combo data from <a href="https://commanderspellbook.com" target="_blank" rel="noopener">Commander Spellbook</a>.</p>` : ""}`;
+    if ($("#comboClaude")) $("#comboClaude").onclick = () => claudeCombos(all, $("#comboClaudeOut"));
+  };
+  box.innerHTML = `<div class="progress" style="margin-top:10px"><div class="spin"></div><span>Looking up combos…</span></div>`;
+  const main = entries.filter(([n]) => { const i = lookup(n); return i >= 0 && !isBasic(card(i)); });
+  try { draw(await csbFindCombos(main, commander ? [commander] : []), null); }
+  catch (e) { console.warn(e); draw(null, e.message || "no answer"); }
+}
+async function claudeCombos(all, out){
+  if (!S.sample) return showKeyNeeded("#comboClaudeOut");
+  out.innerHTML = `<div class="progress"><div class="spin"></div><span>Claude is looking for combos…</span></div>`;
+  try {
+    const r = await S.sample.json(`List the infinite or game-winning combos (2 or 3 cards) that exist within this Magic: The Gathering decklist. Only use cards from the list, and only real, working combos. Reply with only JSON: {"combos":[{"cards":["A","B"],"result":"what it does, one sentence"}]}
+
+DECKLIST:
+${all.map(([n, q]) => `${q} ${n}`).join("\n")}`, { modelTier:"default", cache:false });
+    const inDeck = new Set(all.map(([n]) => lookup(n)));
+    const list = (r?.combos || []).filter(c => Array.isArray(c.cards) && c.cards.length && c.cards.every(n => inDeck.has(lookup(n))));
+    out.innerHTML = list.length ? list.map(c => `<div class="combo"><div class="cpills">${c.cards.map(n => `<span class="cpill own">${esc(card(lookup(n))[C.name])}</span>`).join("")}</div><span class="small">${esc(c.result || "")}</span></div>`).join("") + `<p class="small muted">From Claude, so double-check before relying on it.</p>`
+      : `<p class="small muted">Claude didn't find any combos in this list.</p>`;
+  } catch (e) { out.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
+}
+async function collectionCombos(){
+  const out = $("#comboOut"), btn = $("#comboBtn");
+  const main = [...S.coll].filter(([i]) => !isBasic(card(i))).map(([i, q]) => [card(i)[C.name], q]);
+  if (!main.length) return;
+  btn.disabled = true;
+  out.innerHTML = `<div class="progress" style="margin-top:10px"><div class="spin"></div><span>Checking ${main.length.toLocaleString()} cards against the combo database…</span></div>`;
+  try {
+    const res = await csbFindCombos(main, []);
+    const owned = n => { const i = lookup(n); return i >= 0 && (S.coll.get(i) || 0) > 0; };
+    const byPop = (a, b) => (b.popularity || 0) - (a.popularity || 0);
+    const inc = res.included.slice().sort(byPop);
+    const missingOf = v => comboCards(v).find(n => !owned(n));
+    const almost = res.almostIncluded.filter(v => missingOf(v)).sort((a, b) => { const x = lookup(missingOf(a)), y = lookup(missingOf(b)); return (x >= 0 ? buyPrice(x) : 99) - (y >= 0 ? buyPrice(y) : 99) || byPop(a, b); });
+    S.collCombos = { inc, almost };
+    const two = inc.filter(isTwoCard).length;
+    out.innerHTML = `<p style="margin-top:10px"><b>${inc.length}</b> combo${inc.length === 1 ? "" : "s"} you can put together right now${two ? `, ${two} of them just two cards` : ""}.</p>
+      <div>${inc.slice(0, 40).map(v => comboHTML(v, owned)).join("")}</div>
+      ${inc.length > 40 ? `<p class="small muted">Showing the 40 most popular.</p>` : ""}
+      ${almost.length ? `<details style="margin-top:8px"><summary>One card away <span class="num muted">${almost.length}</span>, cheapest first</summary>${almost.slice(0, 40).map(v => comboHTML(v, owned)).join("")}</details>` : ""}
+      <p class="small muted" style="margin-top:6px">Combo data from <a href="https://commanderspellbook.com" target="_blank" rel="noopener">Commander Spellbook</a>.</p>`;
+  } catch (e) {
+    console.warn(e);
+    out.innerHTML = `<div class="notice bad">Couldn't reach Commander Spellbook (${esc(e.message || "no answer")}). Try again in a minute. You can still check single decks, where Claude can look for combos instead.</div>`;
+  } finally { btn.disabled = false; }
+}
+$("#comboBtn").onclick = collectionCombos;
+
+/* ---------- rulings ---------- */
+S.ruleCards = [];
+function renderRuleCards(){
+  $("#ruleCards").innerHTML = S.ruleCards.map((n, k) => `<button class="chip" data-rk="${k}" aria-label="Remove ${esc(n)}">${esc(n)} ×</button>`).join("");
+  $("#ruleCards").querySelectorAll("[data-rk]").forEach(b => b.onclick = () => { S.ruleCards.splice(+b.dataset.rk, 1); renderRuleCards(); });
+}
+attachCardSearch($("#ruleCard"), $("#ruleSugg"), i => { const n = card(i)[C.name]; if (!S.ruleCards.includes(n) && S.ruleCards.length < 6) S.ruleCards.push(n); renderRuleCards(); });
+S.rulingCache = {};
+async function getRulings(name){
+  if (S.rulingCache[name]) return S.rulingCache[name];
+  const r = await sfFetch("https://api.scryfall.com/cards/named?exact=" + encodeURIComponent(name));
+  if (!r.ok) throw new Error("Scryfall couldn't find " + name);
+  const c = await r.json(); await sleep(100);
+  const rr = await sfFetch(c.rulings_uri); const j = await rr.json();
+  return (S.rulingCache[name] = (j.data || []).map(x => ({ date:x.published_at, text:x.comment })));
+}
+async function loadRulings(){
+  const out = {};
+  for (const n of S.ruleCards) { out[n] = await getRulings(n); await sleep(100); }
+  return out;
+}
+function rulingsHTML(rul){
+  return Object.entries(rul).map(([n, list]) => `<details><summary>${esc(n)} <span class="muted small">${list.length} ruling${list.length === 1 ? "" : "s"}</span></summary>
+    ${list.length ? `<ul class="tight small">${list.map(x => `<li><span class="muted">${esc(x.date)}</span> ${esc(x.text)}</li>`).join("")}</ul>` : `<p class="small muted">No official rulings for this card.</p>`}</details>`).join("");
+}
+$("#ruleShow").onclick = async () => {
+  const out = $("#ruleOut");
+  if (!S.ruleCards.length) { out.innerHTML = `<div class="notice warn">Add at least one card first.</div>`; return; }
+  out.innerHTML = `<div class="progress"><div class="spin"></div><span>Getting rulings…</span></div>`;
+  try { out.innerHTML = rulingsHTML(await loadRulings()); }
+  catch (e) { out.innerHTML = `<div class="notice bad">Couldn't get rulings from Scryfall. Check your connection.</div>`; }
+};
+$("#ruleAsk").onclick = async () => {
+  const out = $("#ruleOut"), q = $("#ruleQ").value.trim();
+  if (!q) { out.innerHTML = `<div class="notice warn">Type your question first.</div>`; return; }
+  if (!S.sample) return showKeyNeeded("#ruleOut");
+  out.innerHTML = `<div class="progress"><div class="spin"></div><span>Getting rulings…</span></div>`;
+  let rul = {};
+  try { rul = await loadRulings(); } catch {}
+  const texts = S.ruleCards.map(n => { const i = lookup(n), c = i >= 0 ? card(i) : null;
+    return `## ${n}\n${c ? `${c[C.cost]} | ${c[C.type]}${c[C.pt] ? " | " + c[C.pt] : ""}\n${c[C.text]}` : ""}\nOfficial rulings:\n${(rul[n] || []).map(x => `- (${x.date}) ${x.text}`).join("\n") || "- none"}`; }).join("\n\n");
+  const ctl = new AbortController();
+  out.innerHTML = `<div class="answer" id="ruleAnswer">Thinking…</div><div class="row" style="margin-top:6px"><button class="ghost mini" id="ruleStop">Stop</button></div>`;
+  $("#ruleStop").onclick = () => ctl.abort();
+  try {
+    const r = await S.sample(`You are a Magic: The Gathering rules expert (a Level 2+ judge). Answer the player's question using the Comprehensive Rules, the cards' Oracle text and the official rulings below. Start with a direct one-line answer, then explain the reasoning in plain language in a short paragraph or two. Mention a ruling by its date when you rely on it. If the answer depends on something the question doesn't say, say what it depends on. Plain text only, no markdown headings.
+
+QUESTION: ${q}
+
+${texts || "(no specific cards given)"}`, { modelTier:"default", signal:ctl.signal, cache:false, onText:({ text }) => { const a = $("#ruleAnswer"); if (a) a.textContent = text; } });
+    $("#ruleAnswer").textContent = r.text;
+    $("#ruleStop").parentElement.remove();
+    if (Object.keys(rul).length) out.insertAdjacentHTML("beforeend", `<div style="margin-top:10px">${rulingsHTML(rul)}</div>`);
+  } catch (e) { if (e?.code !== "cancelled") out.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
+};
+
+/* ---------- wishlist ---------- */
+function saveWish(){ LS.set("dw.wish", S.wish); }
+function addToWish(list){
+  let n = 0;
+  for (const [name, qty] of list) { const e = S.wish.find(w => w.name === name); if (e) e.qty = Math.max(e.qty, qty); else { S.wish.push({ name, qty:qty || 1, target:null }); n++; } }
+  saveWish(); renderWish(); refreshWish(false).catch(() => {});
+  return n;
+}
+function wishPrice(w){ const c = S.cheap?.[w.name]; if (c) return c[0]; const i = lookup(w.name); return i >= 0 ? basePrice(i, "normal") : 0; }
+function renderWish(){
+  const box = $("#wishOut"); if (!box) return;
+  if (!S.wish) S.wish = [];
+  $("#wishPanel").hidden = !S.cards.length;
+  if (!S.wish.length) { box.innerHTML = `<p class="small muted">Nothing on your wishlist yet.</p>`; return; }
+  const rows = S.wish.map(w => ({ w, p:wishPrice(w), hit: w.target != null && wishPrice(w) > 0 && wishPrice(w) <= w.target }));
+  rows.sort((a, b) => (b.hit - a.hit) || a.w.name.localeCompare(b.w.name));
+  const hits = rows.filter(r => r.hit), total = rows.reduce((a, r) => a + r.p * r.w.qty, 0), hitTotal = hits.reduce((a, r) => a + r.p * r.w.qty, 0);
+  box.innerHTML = `<p class="small">${hits.length ? `<b class="have">${hits.length} at or under your target</b> · ${money(hitTotal)} · ` : ""}All ${S.wish.length}: ${money(total)}</p>
+    <div>${rows.map(({ w, p, hit }) => { const i = lookup(w.name), own = i >= 0 ? (S.coll.get(i) || 0) : 0;
+      return `<div class="wish"><span><b>${w.qty > 1 ? w.qty + "× " : ""}${esc(w.name)}</b><br><span class="small ${hit ? "hit" : "muted"}">${p ? money(p) : "no price"}${hit ? " · under target" : ""}${own ? ` · you own ${own}` : ""}</span></span>
+        <span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" inputmode="decimal" aria-label="Target price for ${esc(w.name)}" placeholder="target $" data-wt="${esc(w.name)}" value="${w.target != null ? w.target : ""}"><button class="ghost mini" data-wx="${esc(w.name)}" aria-label="Remove ${esc(w.name)}">×</button></span></div>`; }).join("")}</div>
+    <div class="row btnrow" style="margin-top:8px"><button id="wishPrices">Check prices</button>${hits.length ? `<button id="wishCopyHits">Copy under-target list</button>` : ""}<button id="wishCopy">Copy all</button></div>
+    <div id="wishMsg"></div>`;
+  box.querySelectorAll("[data-wt]").forEach(inp => inp.onchange = () => { const w = S.wish.find(x => x.name === inp.dataset.wt); const v = parseFloat(String(inp.value).replace(/[^0-9.]/g, "")); w.target = isNaN(v) ? null : v; saveWish(); renderWish(); });
+  box.querySelectorAll("[data-wx]").forEach(b => b.onclick = () => { S.wish = S.wish.filter(x => x.name !== b.dataset.wx); saveWish(); renderWish(); });
+  $("#wishPrices").onclick = async () => { $("#wishPrices").disabled = true; $("#wishPrices").textContent = "Checking…";
+    try { await refreshWish(true); } catch { $("#wishMsg").innerHTML = `<div class="notice bad">Couldn't reach Scryfall. Try again in a minute.</div>`; } };
+  if ($("#wishCopyHits")) $("#wishCopyHits").onclick = () => copyText(hits.map(r => `${r.w.qty} ${r.w.name}`).join("\n"), $("#wishCopyHits"), $("#wishMsg"));
+  $("#wishCopy").onclick = () => copyText(S.wish.map(w => `${w.qty} ${w.name}`).join("\n"), $("#wishCopy"), $("#wishMsg"));
+}
+async function refreshWish(force){ if (!S.wish.length) return; await cheapestPrices(S.wish.map(w => w.name), force); renderWish(); }
+attachCardSearch($("#wishAdd"), $("#wishSugg"), i => addToWish([[card(i)[C.name], 1]]));
+
+/* ---------- sharing ---------- */
+const b64u = bytes => { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const fromB64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), ch => ch.charCodeAt(0)); };
+async function encodeDeck(d){
+  const json = JSON.stringify({ n:d.name, f:d.format, c:d.commander || "", l:(d.cards || []).map(c => [c.name, c.qty]), b:d.basics || {} });
+  if (window.CompressionStream) {
+    const buf = new Uint8Array(await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+    return "z" + b64u(buf);
+  }
+  return "j" + b64u(new TextEncoder().encode(json));
+}
+async function decodeDeck(s){
+  const bytes = fromB64u(s.slice(1));
+  const json = s[0] === "z" ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text() : new TextDecoder().decode(bytes);
+  return JSON.parse(json);
+}
+function archidektText(d){
+  const lines = [];
+  if (d.commander) lines.push(`1x ${d.commander} [Commander{top}]`);
+  for (const c of d.cards || []) lines.push(`${c.qty}x ${c.name}`);
+  for (const [n, q] of Object.entries(d.basics || {})) lines.push(`${q}x ${n}`);
+  return lines.join("\n");
+}
+async function shareDeck(d){
+  const out = $("#shareOut");
+  const link = location.origin + location.pathname + "#deck=" + await encodeDeck(d);
+  let qr = "";
+  try { const q = qrcode(0, "L"); q.addData(link); q.make(); qr = q.createSvgTag({ cellSize:4, margin:2, scalable:true, alt:"QR code for " + d.name }); }
+  catch { qr = ""; }
+  out.innerHTML = `<p class="small muted" style="margin-top:8px">Anyone with Deckwright can open this link to see the deck, save it, or check it against their own collection.</p>
+    <input type="text" readonly id="shareLink" value="${esc(link)}">
+    <div class="row btnrow" style="margin-top:8px"><button class="primary" id="shareCopy">Copy link</button>${navigator.share ? `<button id="shareNative">Share…</button>` : ""}</div>
+    ${qr ? `<div class="qrbox" style="margin-top:10px">${qr}</div><p class="small muted" style="text-align:center">Scan with a phone camera.</p>` : `<p class="small muted">This deck is too big for a QR code, but the link works.</p>`}`;
+  $("#shareCopy").onclick = () => copyText(link, $("#shareCopy"), null);
+  $("#shareLink").onfocus = e => e.target.select();
+  if ($("#shareNative")) $("#shareNative").onclick = () => navigator.share({ title:d.name, text:`${d.name}, a ${FMT[d.format].label} deck`, url:link }).catch(() => {});
+}
+async function handleSharedLink(){
+  const m = location.hash.match(/^#deck=([\w-]+)$/); if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try { S.sharedDeck = await decodeDeck(m[1]); }
+  catch { $("#sharedBox").innerHTML = `<div class="notice bad">That shared deck link is damaged. Ask for it again.</div>`; showTab("decks"); return; }
+  showTab("decks"); renderShared();
+}
+function renderShared(){
+  const o = S.sharedDeck, box = $("#sharedBox"); if (!o) { box.innerHTML = ""; return; }
+  const total = (o.l || []).reduce((a, [, q]) => a + q, 0) + Object.values(o.b || {}).reduce((a, q) => a + q, 0) + (o.c ? 1 : 0);
+  box.innerHTML = `<div class="panel"><span class="label">Shared with you</span><h2>${esc(o.n || "Shared deck")}</h2>
+    <p class="small muted">${esc(FMT[o.f]?.label || "Deck")} · ${total} cards${o.c ? " · " + esc(o.c) : ""}</p>
+    <div class="row btnrow"><button class="primary" id="shSave">Save to my decks</button><button id="shCheck">Check against my collection</button><button class="ghost" id="shX">Dismiss</button></div></div>`;
+  const toMap = () => { const m = new Map(); const add = (n, q) => { const i = lookup(n); if (i >= 0) m.set(i, (m.get(i) || 0) + q); };
+    if (o.c) add(o.c, 1); for (const [n, q] of o.l || []) add(n, q); for (const [n, q] of Object.entries(o.b || {})) add(n, q); return m; };
+  $("#shSave").onclick = () => { const cmd = o.c ? lookup(o.c) : null; const d = deckFromCards(o.n || "Shared deck", toMap(), { fmt:FMT[o.f] ? o.f : "casual", cmd: cmd >= 0 ? cmd : null, source:"shared", built:false });
+    S.sharedDeck = null; renderShared(); renderSaved(); S.current = d; showTab("build"); renderDeck(); };
+  $("#shCheck").onclick = () => {
+    $("#checkList").value = (o.c ? `Commander\n1 ${o.c}\n\nDeck\n` : "Deck\n") + (o.l || []).map(([n, q]) => `${q} ${n}`).concat(Object.entries(o.b || {}).map(([n, q]) => `${q} ${n}`)).join("\n");
+    $("#checkFmt").value = FMT[o.f] ? o.f : "auto"; showTab("check"); runCheck();
+  };
+  $("#shX").onclick = () => { S.sharedDeck = null; renderShared(); };
+}
+
+/* ---------- set completion ---------- */
+async function loadSets(){
+  const c = LS.get("dw.sets"); if (c && Date.now() - c.t < 7 * 864e5) return c.sets;
+  const r = await sfFetch("https://api.scryfall.com/sets"); if (!r.ok) throw new Error("Scryfall answered " + r.status);
+  const j = await r.json(), sets = {};
+  for (const s of j.data || []) if (!s.digital) sets[s.code] = [s.name, s.released_at || "", s.printed_size || s.card_count || 0, s.set_type];
+  LS.set("dw.sets", { t:Date.now(), sets });
+  return sets;
+}
+function ownedBySet(sets){
+  const m = new Map();
+  for (const p of S.prints || []) {
+    const s = sets[p.set]; if (!s || !p.cn) continue;
+    const n = parseInt(p.cn, 10);
+    if (!(n >= 1 && n <= s[2]) || String(n) !== String(p.cn).replace(/^0+/, "")) continue;   // main-set numbers only, no variants
+    if (!m.has(p.set)) m.set(p.set, new Set());
+    m.get(p.set).add(n);
+  }
+  return m;
+}
+async function showSets(all){
+  const out = $("#setsOut"), btn = $("#setsBtn"); btn.disabled = true;
+  out.innerHTML = `<div class="progress" style="margin-top:10px"><div class="spin"></div><span>Loading the set list…</span></div>`;
+  try {
+    const sets = S.setsData = await loadSets();
+    const own = ownedBySet(sets);
+    const rows = [...own].map(([code, have]) => ({ code, name:sets[code][0], date:sets[code][1], size:sets[code][2], have:have.size }))
+      .filter(r => r.size >= 10).sort((a, b) => b.have / b.size - a.have / a.size || b.have - a.have);
+    if (!rows.length) { out.innerHTML = `<p class="small muted">No set printings found. Import your ManaBox CSV so the app knows which printings you have.</p>`; return; }
+    const shown = all ? rows : rows.slice(0, 25);
+    out.innerHTML = `<div style="margin-top:8px">${shown.map(r => `<button class="setrow" data-set="${esc(r.code)}"><span><b>${esc(r.name)}</b> <span class="muted small">${esc(r.code.toUpperCase())} · ${esc(r.date.slice(0, 4))}</span></span><span class="num small">${r.have}/${r.size} · ${Math.round(r.have / r.size * 100)}%</span><span class="meter"><i style="width:${Math.round(r.have / r.size * 100)}%"></i></span></button><div data-setout="${esc(r.code)}"></div>`).join("")}</div>
+      ${!all && rows.length > 25 ? `<div class="row"><button class="ghost grow" id="setsAll">Show all ${rows.length} sets</button></div>` : ""}`;
+    out.querySelectorAll("[data-set]").forEach(b => b.onclick = () => setMissing(b.dataset.set));
+    if ($("#setsAll")) $("#setsAll").onclick = () => showSets(true);
+  } catch (e) { console.warn(e); out.innerHTML = `<div class="notice bad">Couldn't reach Scryfall for the set list. Try again in a minute.</div>`; }
+  finally { btn.disabled = false; }
+}
+async function setMissing(code){
+  const box = document.querySelector(`[data-setout="${code}"]`); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  const s = S.setsData[code], have = ownedBySet(S.setsData).get(code) || new Set();
+  box.innerHTML = `<div class="progress" style="padding:8px 0"><div class="spin"></div><span>Getting ${esc(s[0])}…</span></div>`;
+  try {
+    const cards = await sfSearch(`e:${code} game:paper`, null, "prints");
+    const miss = [], seen = new Set();
+    for (const d of cards) {
+      const n = parseInt(d.collector_number, 10);
+      if (!(n >= 1 && n <= s[2]) || String(n) !== d.collector_number || have.has(n) || seen.has(n)) continue;
+      seen.add(n); miss.push({ name:d.name, cn:n, p:priceOf(d, "normal") });
+    }
+    miss.sort((a, b) => a.p - b.p);
+    const total = miss.reduce((a, m) => a + m.p, 0);
+    box.innerHTML = `<div style="padding:6px 0 12px"><p class="small"><b>${miss.length}</b> missing · about <b class="price">${money(total)}</b> to finish (one of each, cheapest first)</p>
+      <div class="list">${miss.slice(0, 60).map(m => `<div class="mover"><span>${esc(m.name)} <span class="muted small">#${m.cn}</span></span><span class="price">${m.p ? money(m.p) : "–"}</span></div>`).join("")}</div>
+      ${miss.length > 60 ? `<p class="small muted">Showing the 60 cheapest.</p>` : ""}
+      <div class="row btnrow"><button data-setcopy="${esc(code)}">Copy missing list</button><button data-setwish="${esc(code)}">Add all to wishlist</button></div></div>`;
+    box.querySelector("[data-setcopy]").onclick = e => copyText(miss.map(m => `1 ${m.name} (${code.toUpperCase()}) ${m.cn}`).join("\n"), e.target, box);
+    box.querySelector("[data-setwish]").onclick = e => { const n = addToWish(miss.map(m => [m.name, 1])); e.target.textContent = `Added ${n}`; };
+  } catch (e) { console.warn(e); box.innerHTML = `<div class="notice bad">Couldn't get that set from Scryfall. Try again in a minute.</div>`; }
+}
+$("#setsBtn").onclick = () => showSets(false);
+
 /* ---------- prices ---------- */
 const money = n => "$" + (Math.round((n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
 const pKey = p => `${p.set}|${p.cn}|${p.finish}`;
@@ -1802,12 +2229,13 @@ async function refreshPrices(){
   }
   save(false);
   snapshotPrices();
+  if ((S.wish || []).length) refreshWish(true).catch(() => {});
   renderCollection();
   say(`Prices updated for ${all.length.toLocaleString()} printings.${found < todo.length ? ` Scryfall had no price for ${(todo.length - found).toLocaleString()} of them, so those use typical prices.` : ""}`, "ok");
 }
-async function cheapestPrices(names){
+async function cheapestPrices(names, force){
   const day = 864e5, now = Date.now();
-  const need = names.filter(n => !(S.cheap[n] && now - S.cheap[n][1] < day) && !/"/.test(n));
+  const need = names.filter(n => !(!force && S.cheap[n] && now - S.cheap[n][1] < day) && !/"/.test(n));
   for (let k = 0; k < need.length; k += 20) {
     const q = "(" + need.slice(k, k + 20).map(n => `!"${n}"`).join(" or ") + ") prefer:usd-low game:paper";
     for (const d of await sfSearch(q)) { const v = priceOf(d, "normal"); if (v) S.cheap[d.name] = [v, now]; }
@@ -1940,7 +2368,7 @@ $("#keyRemove").onclick = () => {
 
 /* ---------- backup ---------- */
 $("#bkSave").onclick = () => {
-  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints, games:S.games, history:S.history };
+  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints, games:S.games, history:S.history, wish:S.wish };
   const blob = new Blob([JSON.stringify(data)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = `deckwright-backup-${new Date().toISOString().slice(0,10)}.json`;
@@ -1963,6 +2391,7 @@ $("#bkLoad").addEventListener("change", e => {
       S.prints = Array.isArray(data.prints) ? data.prints : []; savePrints();
       if (Array.isArray(data.games)) { S.games = data.games; LS.set("dw.games", S.games); }
       if (data.history) { S.history = data.history; LS.set("dw.history", S.history); }
+      if (Array.isArray(data.wish)) { S.wish = data.wish; LS.set("dw.wish", S.wish); }
       S.decks = Array.isArray(data.decks) ? data.decks : []; LS.set("dw.decks", S.decks);
       await persistCollection(); renderAll();
       $("#bkMsg").innerHTML = `<div class="notice ok">Restored.</div>`;
@@ -2044,6 +2473,7 @@ function toRow(d){
   let flags = 0;
   for (const [f, b] of Object.entries(BITS)) if (["legal","restricted"].includes(d.legalities?.[f])) flags += b;
   if ((/Legendary/.test(type) && /Creature/.test(type)) || /can be your commander/.test(d.oracle_text || front.oracle_text || "")) flags += 32;
+  if (d.game_changer) flags += 64;
   return [d.name, d.mana_cost || front.mana_cost || "", d.cmc || 0, type, COLORS.filter(c => colors.includes(c)).join(""), COLORS.filter(c => ident.includes(c)).join(""), oracle, pt, flags,
     +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0), +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0)];
 }
@@ -2056,7 +2486,7 @@ function applyOverlay(){
 }
 function reindex(){
   // exact names first; for loose matches ("Rampant Growth" vs the joke card "Rampant, Growth") prefer the card legal in more formats
-  S.byName = new Map(); S.byNorm = new Map();
+  S.byName = new Map(); S.byNorm = new Map(); S.normNames = S.cards.map(c => norm(c[0]));
   const legalCount = i => { let f = S.cards[i][8] & 31, n = 0; while (f) { n += f & 1; f >>= 1; } return n; };
   const put = (k, i) => { const j = S.byNorm.get(k); if (j === undefined || legalCount(i) > legalCount(j)) S.byNorm.set(k, i); };
   S.cards.forEach((c, i) => { S.byName.set(c[0].toLowerCase(), i); put(norm(c[0]), i); });
