@@ -1163,7 +1163,7 @@ function renderDeck(){
   </div>
   <div class="panel">
     <h3>Share</h3>
-    <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button></div>
+    <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button><button id="forgeBtn">Play it in Forge</button></div>
     <div id="shareOut"></div>
   </div>
   <div class="panel">
@@ -1186,6 +1186,8 @@ function renderDeck(){
   $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
   $("#shareBtn").onclick = () => shareDeck(d);
   $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
+  $("#forgeBtn").onclick = () => forgePanel($("#shareOut"), { name:d.name, format:d.format, commanders:d.commander ? [d.commander] : [],
+    main:[...(d.cards || []).map(c => [c.name, c.qty]), ...Object.entries(d.basics || {})] });
   manaPanel($("#manaOut"), deckEntries(d).filter(([n]) => n !== d.commander).concat(Object.entries(d.basics || {})), d.commander, d.format);
   if ($("#pullBtn")) $("#pullBtn").onclick = () => d.built ? unbuildPanel(d) : pullPanel(d);
   if ($("#histOut")) renderHistory(d);
@@ -1299,6 +1301,7 @@ function renderCheck(){
       <button class="grow" id="manaCheckBtn">Mana base</button>
       <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
+      <button class="grow" id="forgeCheckBtn">Play it in Forge</button>
       <button class="primary grow" id="evalBtn" data-claude>${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
     <textarea id="needArea" hidden readonly></textarea>
@@ -1323,6 +1326,8 @@ function renderCheck(){
   };
   $("#evalBtn").onclick = evaluateDeck;
   $("#saveCheckBtn").onclick = saveCheckAsDeck;
+  $("#forgeCheckBtn").onclick = () => forgePanel($("#evalMsg"), { name:k.commanders.length ? card(k.commanders[0])[C.name] : "Checked deck", format:k.fmt,
+    commanders:k.commanders.map(i => card(i)[C.name]), main:k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]) });
   if ($("#wishCheckBtn")) $("#wishCheckBtn").onclick = () => { const n = addToWish(missing.map(r => [card(r.i)[C.name], r.missing])); $("#evalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist on the Collection tab.</div>`; };
   $("#manaCheckBtn").onclick = () => { const cmd = k.commanders.length ? card(k.commanders[0])[C.name] : null; manaPanel($("#checkMana"), k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]), cmd, k.fmt); };
   $("#bracketCheckBtn").onclick = () => { const cmd = k.commanders.length ? card(k.commanders[0])[C.name] : null; bracketPanel($("#checkBracket"), k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]), cmd, k.fmt, null); };
@@ -3089,6 +3094,45 @@ async function decodeDeck(s){
   const bytes = fromB64u(s.slice(1));
   const json = s[0] === "z" ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text() : new TextDecoder().decode(bytes);
   return JSON.parse(json);
+}
+/* ---------- Forge (free Magic program with an AI opponent) ---------- */
+// Forge names split cards and Rooms in full ("Fire // Ice") and every other two-sided card by its front face.
+function forgeName(n){
+  const i = lookup(n); if (i < 0) return n;
+  const c = card(i), full = c[C.name];
+  if (!full.includes(" // ")) return full;
+  return / \/\/ /.test(c[C.cost]) && /\b(Instant|Sorcery|Room)\b/.test(c[C.type]) ? full : full.split(" // ")[0];
+}
+function forgeLists(o){
+  const merge = list => { const m = new Map(); for (const [n, q] of list) { const f = forgeName(n); m.set(f, (m.get(f) || 0) + q); } return [...m]; };
+  return { cmd:merge(o.commanders.map(n => [n, 1])), main:merge(o.main) };
+}
+function forgeDck(o){
+  const { cmd, main } = forgeLists(o);
+  return `[metadata]\nName=${o.name.replace(/[\r\n]/g, " ")}\n${cmd.length ? `[Commander]\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n` : ""}[Main]\n${main.map(([n, q]) => `${q} ${n}`).join("\n")}\n[Sideboard]\n`;
+}
+function forgePaste(o){
+  const { cmd, main } = forgeLists(o);
+  return `${cmd.length ? `Commander\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n\nMain\n` : ""}${main.map(([n, q]) => `${q} ${n}`).join("\n")}`;
+}
+function forgePanel(box, o){
+  const isCmd = o.format === "commander" || o.commanders.length;
+  box.innerHTML = `<div class="notice" style="margin-top:8px"><b>Play this deck against the computer in Forge</b>
+    <p class="small">Forge is a free Magic program with the full rules and an AI opponent. It runs on Android and PC. Get it from <a href="https://github.com/Card-Forge/forge/releases" target="_blank" rel="noopener">Forge's releases page</a>.</p>
+    <ol class="small tight">
+      <li>Tap <b>Copy for Forge</b> below.</li>
+      <li>In Forge, open the ${isCmd ? "<b>Commander</b> deck editor" : "deck editor"}, start a new deck and tap <b>Import</b>.</li>
+      <li>Paste the list, confirm, then save the deck.${isCmd ? " If the commander ends up in the main deck, move it to the command zone." : ""}</li>
+    </ol>
+    <div class="row btnrow"><button class="primary grow" id="forgeCopy">Copy for Forge</button><button class="grow" id="forgeFile">Download deck file (.dck)</button></div>
+    <p class="small muted">The deck file is for Forge on PC: put it in Forge's decks folder, under ${isCmd ? "commander" : "constructed"}.</p>
+    <div id="forgeFallback"></div></div>`;
+  $("#forgeCopy").onclick = () => copyText(forgePaste(o), $("#forgeCopy"), $("#forgeFallback"));
+  $("#forgeFile").onclick = () => {
+    const url = URL.createObjectURL(new Blob([forgeDck(o)], { type:"text/plain" })), a = document.createElement("a");
+    a.href = url; a.download = (o.name || "deck").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 60) + ".dck";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
 }
 function archidektText(d){
   const lines = [];
