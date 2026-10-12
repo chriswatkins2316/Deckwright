@@ -139,6 +139,11 @@ details summary{cursor:pointer;font-weight:600}
 .cardimg{display:block;width:min(250px,100%);aspect-ratio:488/680;border-radius:4.6%/3.4%;margin:4px auto 10px;background:var(--line)}
 .keyrow{display:flex;gap:8px}
 .keyrow input{flex:1}
+.valuebox{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.valuebox .bignum{color:var(--accent)}
+.costline{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.costline b{display:block;font:500 1.35rem var(--mono);font-variant-numeric:tabular-nums}
+.price{font-family:var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
 ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
@@ -174,8 +179,9 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 
     <div class="panel" id="collPanel">
       <div class="stats" id="collStats"></div>
+      <div id="collValue"></div>
       <div class="chips" id="colorBreak"></div>
-      <input type="search" id="collSearch" placeholder="Search name, type or rules text">
+      <div class="row" id="collTools"><input type="search" id="collSearch" class="grow" style="flex:1" placeholder="Search name, type or rules text"><select id="collSort" style="width:auto" aria-label="Sort"><option value="name">A to Z</option><option value="value">Most valuable</option></select></div>
       <div class="chips" id="typeFilter"></div>
       <div class="list" id="collList"></div>
       <div class="row" id="collMore"></div>
@@ -385,20 +391,29 @@ function parseCSV(text){
   return rows.filter(r => r.some(x => x.trim() !== ""));
 }
 function readImport(text){
-  const out = new Map(), unmatched = new Map(); let lines = 0;
-  const add = (name, qty) => {
+  const out = new Map(), unmatched = new Map(), prints = []; let lines = 0;
+  const add = (name, qty, pr) => {
     qty = Math.max(0, parseInt(qty,10) || 0); if (!qty || !name) return;
     lines++;
     const i = lookup(name);
     if (i < 0) unmatched.set(name, (unmatched.get(name)||0) + qty);
-    else out.set(i, (out.get(i)||0) + qty);
+    else { out.set(i, (out.get(i)||0) + qty); if (pr) prints.push({ ...pr, name:card(i)[C.name], qty }); }
   };
   const first = text.split(/\r?\n/,1)[0] || "";
   if (first.includes(",") && /name/i.test(first)) {
     const rows = parseCSV(text), head = rows.shift().map(h => h.trim().toLowerCase());
     const ni = head.findIndex(h => h === "name" || h === "card name" || h === "card");
     const qi = head.findIndex(h => ["quantity","qty","count","amount"].includes(h));
-    for (const r of rows) add(r[ni], qi >= 0 ? r[qi] : 1);
+    const col = (...names) => head.findIndex(h => names.includes(h));
+    const si = col("set code","set","edition code"), ci = col("collector number","card number","number","cn");
+    const fi = col("foil","finish","printing"), idi = col("scryfall id","scryfall_id");
+    for (const r of rows) {
+      const f = fi >= 0 ? String(r[fi] || "").trim().toLowerCase() : "";
+      const finish = f === "etched" ? "etched" : ["foil","true","yes"].includes(f) ? "foil" : "normal";
+      const set = si >= 0 ? String(r[si] || "").trim().toLowerCase() : "", cn = ci >= 0 ? String(r[ci] || "").trim() : "";
+      const id = idi >= 0 ? String(r[idi] || "").trim() : "";
+      add(r[ni], qi >= 0 ? r[qi] : 1, (set && cn) || id ? { id, set, cn, finish } : null);
+    }
   } else {
     for (const raw of text.split(/\r?\n/)) {
       const l = raw.trim(); if (!l || /^(deck|sideboard|commander|companion)\s*:?\s*$/i.test(l)) continue;
@@ -406,7 +421,7 @@ function readImport(text){
       if (m) add(m[2], m[1]); else add(l, 1);
     }
   }
-  return { out, unmatched, lines };
+  return { out, unmatched, lines, prints };
 }
 function showPreview(res){
   S.pending = res;
@@ -430,6 +445,7 @@ async function applyImport(merge){
   const res = S.pending; if (!res) return;
   const next = merge ? new Map(S.coll) : new Map();
   for (const [i,q] of res.out) next.set(i, (next.get(i)||0) + q);
+  S.prints = mergePrints(merge ? S.prints : [], res.prints || []); savePrints();
   S.coll = next; S.updatedAt = Date.now(); S.pending = null;
   $("#importPreview").innerHTML = `<div class="notice ok">Collection saved.</div>`;
   setTimeout(() => { $("#importPreview").hidden = true; }, 2500);
@@ -451,6 +467,8 @@ function collFromObject(o){ const m = new Map(); for (const [n,q] of Object.entr
 function restoreLocal(){
   const c = LS.get("dw.collection"); if (c) { S.coll = collFromObject(c.items); S.updatedAt = c.updatedAt || 0; }
   S.decks = LS.get("dw.decks") || [];
+  S.prints = LS.get("dw.prints") || []; indexPrints();
+  S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -505,11 +523,11 @@ function renderCollection(){
   const total = [...S.coll.values()].reduce((a,b)=>a+b,0);
   if (!S.coll.size) {
     $("#collStats").innerHTML = ""; $("#colorBreak").innerHTML = ""; $("#typeFilter").innerHTML = ""; $("#collMore").innerHTML = "";
-    $("#collSearch").hidden = true;
+    $("#collTools").hidden = true; $("#collValue").innerHTML = "";
     $("#collList").innerHTML = `<div class="empty"><h3>No cards yet</h3><p class="muted small">Import your ManaBox export above. Your collection is saved on this device. Use Backup in Settings to move it to another one.</p></div>`;
     return;
   }
-  $("#collSearch").hidden = false;
+  $("#collTools").hidden = false; renderValue();
   const byColor = {W:0,U:0,B:0,R:0,G:0,M:0,C:0}; let cmd = 0;
   for (const [i,q] of S.coll) { const c = card(i), id = c[C.col]; if (!id) byColor.C += q; else if (id.length > 1) byColor.M += q; else byColor[id] += q; if (canCommand(c)) cmd++; }
   $("#collStats").innerHTML = `<div class="stat"><span class="label">Cards</span><b>${total.toLocaleString()}</b></div><div class="stat"><span class="label">Different</span><b>${S.coll.size.toLocaleString()}</b></div><div class="stat"><span class="label">Commanders</span><b>${cmd}</b></div>`;
@@ -524,16 +542,16 @@ function renderCollection(){
     else if (S.filter.type !== "All" && !c[C.type].includes(S.filter.type)) return false;
     if (q && !norm(c[C.name]).includes(q) && !c[C.type].toLowerCase().includes(ql) && !c[C.text].toLowerCase().includes(ql)) return false;
     return true;
-  }).sort((a,b) => card(a[0])[C.name].localeCompare(card(b[0])[C.name]));
+  }).sort(S.filter.sort === "value" ? (a,b) => ownedValue(b[0]) - ownedValue(a[0]) : (a,b) => card(a[0])[C.name].localeCompare(card(b[0])[C.name]));
   const shown = rows.slice(0, S.shown);
-  $("#collList").innerHTML = shown.length ? shown.map(([i,qty]) => cardRow(i, qty)).join("") : `<p class="muted small">No cards match.</p>`;
+  $("#collList").innerHTML = shown.length ? shown.map(([i,qty]) => cardRow(i, qty, "", ownedValue(i))).join("") : `<p class="muted small">No cards match.</p>`;
   bindCardRows($("#collList"));
   $("#collMore").innerHTML = rows.length > S.shown ? `<button id="moreBtn" class="grow">Show more (${(rows.length - S.shown).toLocaleString()} left)</button>` : `<span class="small muted">${rows.length.toLocaleString()} shown</span>`;
   if ($("#moreBtn")) $("#moreBtn").onclick = () => { S.shown += 200; renderCollection(); };
 }
-function cardRow(i, qty, role){
+function cardRow(i, qty, role, price){
   const c = card(i);
-  return `<div class="card"><span class="q">${qty}×</span><button class="n" data-i="${i}" aria-expanded="false">${esc(c[C.name])}${role?`<span class="role">${esc(role)}</span>`:""}</button><span class="cost">${pips(c[C.cost])}</span><span class="t">${esc(c[C.type])}${c[C.pt]?` · ${esc(c[C.pt])}`:""}</span></div>`;
+  return `<div class="card"><span class="q">${qty}×</span><button class="n" data-i="${i}" aria-expanded="false">${esc(c[C.name])}${role?`<span class="role">${esc(role)}</span>`:""}</button><span class="cost">${pips(c[C.cost])}</span><span class="t">${esc(c[C.type])}${c[C.pt]?` · ${esc(c[C.pt])}`:""}${price > 0 ? ` · <span class="price">${money(price)}</span>` : ""}</span></div>`;
 }
 function bindCardRows(root){
   root.querySelectorAll("button.n").forEach(b => b.onclick = () => {
@@ -818,6 +836,7 @@ function renderDeck(){
       <span class="count ${total >= f.size ? "ok" : "short"}">${total}/${f.size}</span></div>
     ${cmdIdx >= 0 ? `<div class="list">${cardRow(cmdIdx, 1, "commander")}</div>` : ""}
     ${d.summary ? `<p>${esc(d.summary)}</p>` : ""}
+    <p class="small muted">Value of these cards: <b class="price">${money(d.cards.reduce((a,e) => { const i = lookup(e.name); return a + (i < 0 ? 0 : e.qty * unitOwned(i)); }, 0) + (cmdIdx >= 0 ? unitOwned(cmdIdx) : 0))}</b></p>
     ${d.gameplan ? `<details><summary>How to play it</summary><p style="margin-top:6px">${esc(d.gameplan)}</p></details>` : ""}
     ${d.warnings.map(w => `<div class="notice ${w.kind}">${esc(w.text)}</div>`).join("")}
     <div class="row">
@@ -922,6 +941,7 @@ function runCheck(){
   if (fmt !== "commander" && total < 60) issues.push(`The list has ${total} cards; constructed decks need at least 60.`);
   S.check = { fmt, rows, issues, identity, total, ignoreBasics, unknown:[...p.unknown], commanders:p.commanders, evalResult:null };
   renderCheck();
+  fetchCheckPrices();
 }
 function renderCheck(){
   const k = S.check, view = $("#checkView");
@@ -932,7 +952,8 @@ function renderCheck(){
   const missing = k.rows.filter(r => r.missing > 0);
   const missCount = missing.reduce((a,r)=>a+r.missing,0);
   const by = st => k.rows.filter(r => r.status === st).sort((a,b) => card(a.i)[C.cmc] - card(b.i)[C.cmc] || card(a.i)[C.name].localeCompare(card(b.i)[C.name]));
-  const rowHTML = (r, label) => cardRow(r.i, label === "need" ? r.missing : label === "part" ? r.missing : r.need, label === "part" ? `own ${r.owned} of ${r.need}` : r.isCmd ? "commander" : "");
+  const rowHTML = (r, label) => cardRow(r.i, label === "need" ? r.missing : label === "part" ? r.missing : r.need, label === "part" ? `own ${r.owned} of ${r.need}` : r.isCmd ? "commander" : "",
+    label === "need" || label === "part" ? r.missing * buyPrice(r.i) : label === "have" ? r.need * unitOwned(r.i) : 0);
   const ev = k.evalResult;
   view.innerHTML = `
   <div class="panel">
@@ -941,6 +962,9 @@ function renderCheck(){
       <span class="count num">${k.total} cards</span></div>
     <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
     <div class="stats"><div class="stat"><span class="label">Own all</span><b class="have">${by("have").length}</b></div><div class="stat"><span class="label">Own some</span><b class="part">${by("part").length}</b></div><div class="stat"><span class="label">Cards to get</span><b class="need">${missCount}</b></div></div>
+    <div class="costline"><div><span class="label">Cost to finish</span><b class="need">${money(missing.reduce((a,r) => a + r.missing * buyPrice(r.i), 0))}</b></div>
+      <div><span class="label">Your cards in it</span><b>${money(k.rows.filter(r => r.status !== "basic").reduce((a,r) => a + Math.min(r.need, r.owned) * unitOwned(r.i), 0))}</b></div></div>
+    ${missing.length ? `<p class="small muted">${k.priceState === "live" ? "Cheapest printing of each missing card on Scryfall (TCGplayer market prices)." : k.priceState === "offline" ? "Estimated from typical prices. Couldn't reach Scryfall for current ones." : "Estimated from typical prices. Getting current cheapest prices…"}</p>` : ""}
     ${k.unknown.length ? `<div class="notice warn">${k.unknown.length} line${k.unknown.length>1?"s":""} didn't match a card and ${k.unknown.length>1?"were":"was"} skipped: ${esc(k.unknown.slice(0,8).map(([n]) => n).join(", "))}${k.unknown.length>8?" …":""}</div>` : ""}
     ${k.issues.length ? `<div class="notice bad"><b>Rules problems</b><br>${k.issues.slice(0,12).map(esc).join("<br>")}${k.issues.length>12?"<br>…":""}</div>` : `<div class="notice ok">No rules problems for ${esc(FMT[k.fmt].label)}.</div>`}
     <div class="row">
@@ -1095,6 +1119,92 @@ function renderSaved(){
   });
 }
 
+/* ---------- prices ---------- */
+const money = n => "$" + (Math.round((n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const pKey = p => `${p.set}|${p.cn}|${p.finish}`;
+function basePrice(i, finish){ const c = card(i), u = +c[9] || 0, f = +c[10] || 0; return finish === "normal" ? (u || f) : (f || u); }
+function printPrice(p, i){ const live = S.livePrices?.map?.[pKey(p)]; return live != null ? live : basePrice(i, p.finish); }
+function mergePrints(a, b){
+  const m = new Map();
+  for (const p of [...a, ...b]) { const k = (p.id || "") + "|" + pKey(p); const cur = m.get(k); if (cur) cur.qty += p.qty; else m.set(k, { ...p }); }
+  return [...m.values()];
+}
+function indexPrints(){ S.printsByName = new Map(); for (const p of S.prints || []) { const l = S.printsByName.get(p.name) || []; l.push(p); S.printsByName.set(p.name, l); } }
+function savePrints(){ LS.set("dw.prints", S.prints); indexPrints(); }
+function ownedValue(i){
+  const total = S.coll.get(i) || 0; if (!total) return 0;
+  let v = 0, counted = 0;
+  for (const p of S.printsByName?.get(card(i)[C.name]) || []) {
+    const q = Math.min(p.qty, total - counted); if (q <= 0) break;
+    v += q * printPrice(p, i); counted += q;
+  }
+  return v + (total - counted) * basePrice(i, "normal");
+}
+function unitOwned(i){ const q = S.coll.get(i) || 0; return q ? ownedValue(i) / q : basePrice(i, "normal"); }
+function buyPrice(i){ const c = S.cheap?.[card(i)[C.name]]; return c ? c[0] : basePrice(i, "normal"); }
+function collectionValue(){ let v = 0; for (const i of S.coll.keys()) v += ownedValue(i); return v; }
+function renderValue(){
+  const box = $("#collValue"); if (!box) return;
+  if (!S.coll.size) { box.innerHTML = ""; return; }
+  const lp = S.livePrices, m = window.MTG_DB?.meta || {};
+  const priced = (S.prints || []).length;
+  box.innerHTML = `<div class="valuebox"><div class="grow"><span class="label">Collection value</span><div class="bignum">${money(collectionValue())}</div>
+    <p class="small muted">${lp ? `Your exact printings and foils, Scryfall prices from ${esc(lp.date)}.` : `Estimate from typical prices (${esc(m.priceDate || m.date || "")}).${priced ? " Refresh to price your exact printings and foils." : ""}`}</p></div>
+    ${priced ? `<button id="priceBtn">Refresh prices</button>` : ""}</div><div id="priceMsg"></div>`;
+  if ($("#priceBtn")) $("#priceBtn").onclick = refreshPrices;
+}
+$("#collSort").onchange = e => { S.filter.sort = e.target.value; S.shown = 120; renderCollection(); };
+const priceOf = (d, finish) => { const n = k => d.prices?.[k] ? +d.prices[k] : 0;
+  return finish === "etched" ? (n("usd_etched") || n("usd_foil") || n("usd")) : finish === "foil" ? (n("usd_foil") || n("usd_etched") || n("usd")) : (n("usd") || n("usd_foil") || n("usd_etched")); };
+async function refreshPrices(){
+  const btn = $("#priceBtn"), say = (t, k = "") => { const b = $("#priceMsg"); if (b) b.innerHTML = `<div class="notice ${k}">${esc(t)}</div>`; };
+  const todo = [...new Map((S.prints || []).filter(p => p.set && p.cn).map(p => [`${p.set}|${p.cn}`, p])).values()];
+  if (!todo.length) return;
+  if (btn) btn.disabled = true;
+  const map = {}; let found = 0, failed = 0;
+  try {
+    for (let k = 0; k < todo.length; k += 40) {
+      say(`Getting prices… ${Math.min(k + 40, todo.length)} of ${todo.length} printings`);
+      const q = todo.slice(k, k + 40).map(p => `(e:${p.set.replace(/[^a-z0-9]/g, "")} cn:"${p.cn.replace(/"/g, "")}")`).join(" or ");
+      let res = [];
+      try { res = await sfSearch(q, null, "prints"); }
+      catch (e) { if (/answered 4\d\d/.test(e.message)) { failed++; continue; } throw e; }
+      for (const d of res) {
+        found++;
+        for (const fin of ["normal","foil","etched"]) { const v = priceOf(d, fin); if (v) map[`${d.set}|${d.collector_number}|${fin}`] = v; }
+      }
+      await sleep(120);
+    }
+    S.livePrices = { date:new Date().toISOString().slice(0, 10), map };
+    LS.set("dw.prices", S.livePrices);
+    renderCollection();
+    say(`Prices updated for ${found.toLocaleString()} of ${todo.length.toLocaleString()} printings.${found < todo.length ? " The rest use typical prices." : ""}`, "ok");
+  } catch (e) {
+    console.warn(e);
+    say("Couldn't reach Scryfall. Check your connection and try again.", "bad");
+    if ($("#priceBtn")) $("#priceBtn").disabled = false;
+  }
+}
+async function cheapestPrices(names){
+  const day = 864e5, now = Date.now();
+  const need = names.filter(n => !(S.cheap[n] && now - S.cheap[n][1] < day) && !/"/.test(n));
+  for (let k = 0; k < need.length; k += 20) {
+    const q = "(" + need.slice(k, k + 20).map(n => `!"${n}"`).join(" or ") + ") prefer:usd-low game:paper";
+    for (const d of await sfSearch(q)) { const v = priceOf(d, "normal"); if (v) S.cheap[d.name] = [v, now]; }
+    if (k + 20 < need.length) await sleep(120);
+  }
+  for (const [n, [, t]] of Object.entries(S.cheap)) if (now - t > 7 * day) delete S.cheap[n];
+  LS.set("dw.cheap", S.cheap);
+}
+async function fetchCheckPrices(){
+  const k = S.check; if (!k) return;
+  const names = [...new Set(k.rows.filter(r => r.missing > 0).map(r => card(r.i)[C.name]))];
+  if (!names.length) return;
+  try { await cheapestPrices(names); k.priceState = "live"; }
+  catch (e) { console.warn(e); k.priceState = "offline"; }
+  if (S.check === k && $("#evalProgress")?.hidden !== false) renderCheck();
+}
+
 /* ---------- standalone: Claude through your own API key ---------- */
 const MODELS = { quick:"claude-haiku-5-5", default:"claude-sonnet-5-5", complex:"claude-opus-5-5" };
 const KEY_LS = "dw.apikey";
@@ -1210,7 +1320,7 @@ $("#keyRemove").onclick = () => {
 
 /* ---------- backup ---------- */
 $("#bkSave").onclick = () => {
-  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks };
+  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints };
   const blob = new Blob([JSON.stringify(data)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = `deckwright-backup-${new Date().toISOString().slice(0,10)}.json`;
@@ -1230,6 +1340,7 @@ $("#bkLoad").addEventListener("change", e => {
     $("#bkCancel").onclick = () => { $("#bkMsg").innerHTML = ""; };
     $("#bkApply").onclick = async () => {
       S.coll = collFromObject(data.collection); S.updatedAt = Date.now();
+      S.prints = Array.isArray(data.prints) ? data.prints : []; savePrints();
       S.decks = Array.isArray(data.decks) ? data.decks : []; LS.set("dw.decks", S.decks);
       await persistCollection(); renderAll();
       $("#bkMsg").innerHTML = `<div class="notice ok">Restored.</div>`;
@@ -1256,7 +1367,8 @@ function toRow(d){
   let flags = 0;
   for (const [f, b] of Object.entries(BITS)) if (["legal","restricted"].includes(d.legalities?.[f])) flags += b;
   if ((/Legendary/.test(type) && /Creature/.test(type)) || /can be your commander/.test(d.oracle_text || front.oracle_text || "")) flags += 32;
-  return [d.name, d.mana_cost || front.mana_cost || "", d.cmc || 0, type, COLORS.filter(c => colors.includes(c)).join(""), COLORS.filter(c => ident.includes(c)).join(""), oracle, pt, flags];
+  return [d.name, d.mana_cost || front.mana_cost || "", d.cmc || 0, type, COLORS.filter(c => colors.includes(c)).join(""), COLORS.filter(c => ident.includes(c)).join(""), oracle, pt, flags,
+    +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0), +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0)];
 }
 function applyOverlay(){
   const ov = LS.get(OV_LS); if (!ov) return;
@@ -1269,8 +1381,8 @@ function reindex(){
   S.byNorm = new Map();
   S.cards.forEach((c, i) => { S.byNorm.set(norm(c[0]), i); if (c[0].includes(" // ")) { const f = norm(c[0].split(" // ")[0]); if (!S.byNorm.has(f)) S.byNorm.set(f, i); } });
 }
-async function sfSearch(q, onPage){
-  let url = "https://api.scryfall.com/cards/search?unique=cards&q=" + encodeURIComponent(q);
+async function sfSearch(q, onPage, unique = "cards"){
+  let url = "https://api.scryfall.com/cards/search?unique=" + unique + "&q=" + encodeURIComponent(q);
   const out = [];
   while (url) {
     const r = await fetch(url);
