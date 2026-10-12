@@ -200,12 +200,49 @@ button.mini{min-height:32px;padding:2px 10px}
 .qrbox{background:#fff;padding:10px;border-radius:8px;width:min(260px,100%);margin:0 auto}
 .qrbox svg{display:block;width:100%;height:auto}
 .answer{white-space:pre-wrap;line-height:1.55}
+.gallery{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px}
+.gtrack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;border-radius:8px}
+.gtrack::-webkit-scrollbar{display:none}
+.gtrack:focus-visible{outline:2px solid var(--accent)}
+.gslide{flex:0 0 100%;scroll-snap-align:center;margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.gslide .cardimg{margin:0 auto}
+.gslide figcaption{text-align:center;padding:0 8px}
+.cardimg.foil{box-shadow:0 0 0 2px var(--accent),0 0 14px -2px var(--accent)}
+.gnav{display:flex;justify-content:center;align-items:center;gap:12px}
+.gnav button{min-width:44px;font-size:1.2rem}
+.scanvideo{width:100%;max-height:60vh;border-radius:var(--r);background:#000;display:block;object-fit:cover}
+.scanitem{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
+.scanitem:last-child{border-bottom:0}
+.scanitem .qty{display:flex;align-items:center;gap:4px}
+.scanitem .qty b{font-family:var(--mono);min-width:1.4em;text-align:center}
+.flag{color:var(--warn);font-weight:600}
+.bars{display:flex;flex-direction:column;gap:6px}
+.barrow{display:grid;grid-template-columns:9.5em 1fr 3.2em;gap:8px;align-items:center;font-size:.85rem}
+.barrow > span:first-child{min-width:0;overflow-wrap:anywhere;line-height:1.25}
+.bt{height:10px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.bt i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px}
+.bv{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.manarow{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.manarow:last-child{border-bottom:0}
+.manarow .why{grid-column:2/4;font-size:.8rem;color:var(--muted)}
+.chk-ok{color:var(--ok);font-weight:600}.chk-warn{color:var(--warn);font-weight:600}.chk-bad{color:var(--bad);font-weight:600}
+.pullrow{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:7px 0;border-bottom:1px solid var(--line);align-items:start}
+.pullrow:last-child{border-bottom:0}
+.pullrow input{width:22px;height:22px;margin-top:2px}
+.pullrow.done span{opacity:.5;text-decoration:line-through}
+.where{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.vers{padding:9px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.vers:last-child{border-bottom:0}
+.opp{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.syncbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:9}
 ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
 <body>
 
+<datalist id="placeList"></datalist>
 <div class="wrap" id="app">
+  <div id="syncBanner" class="syncbar"></div>
   <header class="top">
     <div>
       <h1>Deckwright</h1>
@@ -219,8 +256,8 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <h2>Your collection</h2>
       <label class="file" id="dropzone">
         <input type="file" id="fileInput">
-        <strong>Import a ManaBox export</strong>
-        <span class="small muted">In ManaBox: Collection → ⋯ → Export → CSV. Then pick the file here.</span>
+        <strong>Import your collection</strong>
+        <span class="small muted">A CSV export from ManaBox, Delver Lens, TCGplayer, Dragon Shield, Moxfield, Deckbox and most other collection apps. In ManaBox: Collection → ⋯ → Export → CSV.</span>
       </label>
       <p class="small muted">If no file picker opens, open the CSV in any text app, copy everything, and paste it below.</p>
       <details id="pasteDetails">
@@ -233,11 +270,27 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div id="importPreview" hidden></div>
     </div>
 
+    <div class="panel" id="scanPanel">
+      <h2>Scan cards</h2>
+      <p class="small muted">Point your camera at a card and Claude reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil.</p>
+      <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
+        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+      <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
+      <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
+        <video id="scanVideo" class="scanvideo" playsinline muted autoplay></video>
+        <div class="row btnrow"><button class="primary" id="scanSnap">Scan this card</button><button class="ghost" id="scanStop">Stop camera</button></div>
+      </div>
+      <div id="scanStatus"></div>
+      <div id="scanList"></div>
+    </div>
+
     <div class="panel" id="collPanel">
       <div class="stats" id="collStats"></div>
       <div id="collValue"></div>
       <div class="chips" id="colorBreak"></div>
       <div class="row" id="collTools"><input type="search" id="collSearch" class="grow" style="flex:1" placeholder="Search name, type or rules text"><select id="collSort" style="width:auto" aria-label="Sort"><option value="name">A to Z</option><option value="value">Most valuable</option></select></div>
+      <div class="row" id="locTools"><select id="collLoc" style="flex:1" aria-label="Show cards in a place"></select><button class="ghost" id="locBulkBtn">Put these in…</button></div>
+      <div id="locBulk"></div>
       <div class="chips" id="typeFilter"></div>
       <div class="list" id="collList"></div>
       <div class="row" id="collMore"></div>
@@ -268,6 +321,9 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <p class="small muted">How much of each set you own, counting the exact printings from your ManaBox import. Tap a set to see what's missing and what it costs.</p>
       <div class="row"><button class="grow" id="setsBtn">Show my sets</button></div>
       <div id="setsOut"></div>
+    </div>
+    <div class="panel" id="statsPanel" hidden>
+      <details id="statsDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
     </div>
   </section>
 
@@ -378,6 +434,13 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div id="lifeMsg"></div>
     </div>
     <div class="panel">
+      <h2>Game night</h2>
+      <p class="small muted">Add the other players' decks, by bracket or by pasting their list, and see which of your decks fits the table best.</p>
+      <div id="gnPlayers"></div>
+      <div class="row btnrow"><button id="gnAdd">Add a player</button><button class="primary" id="gnGo">Suggest my deck</button></div>
+      <div id="gnOut"></div>
+    </div>
+    <div class="panel">
       <h2>Rulings</h2>
       <p class="small muted">Ask how cards work, alone or together. Answers use each card's rules text and its official rulings from Scryfall.</p>
       <div class="field autocomplete"><label class="label" for="ruleCard">Cards involved</label><input type="text" id="ruleCard" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="ruleSugg" hidden></div></div>
@@ -407,6 +470,16 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="row"><button class="grow" id="updCards">Check Scryfall for new cards</button></div>
       <p class="small muted">Adds newly printed cards and picks up ban list changes and Standard rotation. Takes about 20 seconds.</p>
       <div id="updMsg"></div>
+    </div>
+    <div class="panel">
+      <h2>Sync between devices</h2>
+      <p class="small muted">Keeps your collection, decks, wishlist, card places, prices and records the same on every device, using a private GitHub Gist on your own GitHub account.</p>
+      <div id="syncState"></div>
+      <div class="field"><label class="label" for="ghToken">GitHub token</label>
+        <div class="keyrow"><input type="password" id="ghToken" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ghp_… or github_pat_…"><button class="ghost" id="ghShow">Show</button></div></div>
+      <div class="row btnrow"><button class="primary" id="syncSetup">Turn on sync</button><button id="syncNowBtn">Sync now</button><button class="ghost danger" id="syncOff">Turn off</button></div>
+      <p class="small muted">Make a token at <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Deckwright%20sync" target="_blank" rel="noopener">github.com/settings/tokens/new</a> with only the <b>gist</b> box ticked, and use the same token on each device. It stays on the device and is only sent to GitHub.</p>
+      <div id="syncMsg"></div>
     </div>
     <div class="panel">
       <h2>Backup</h2>
@@ -465,6 +538,7 @@ function loadDB(){
     restoreLocal();
     renderAll();
     handleSharedLink();
+    syncNow(true);
   };
   s.onerror = () => { $("#dbstatus").textContent = "The card database didn't load. Reload the page to try again."; };
   document.body.appendChild(s);
@@ -492,13 +566,13 @@ function pips(cost){
 const idPips = id => id ? [...id].map(x => `<span class="pip ${x}" aria-label="${CNAME[x]}"></span>`).join("") : `<span class="pip" aria-label="Colorless"></span>`;
 
 /* ---------- import ---------- */
-function parseCSV(text){
+function parseCSV(text, delim = ","){
   const rows = []; let row = [], f = "", q = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (q) { if (ch === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
     else if (ch === '"') q = true;
-    else if (ch === ",") { row.push(f); f = ""; }
+    else if (ch === delim) { row.push(f); f = ""; }
     else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
     else f += ch;
   }
@@ -515,20 +589,28 @@ function readImport(text){
     else { out.set(i, (out.get(i)||0) + qty); if (pr) prints.push({ ...pr, name:card(i)[C.name], qty }); }
     return i;
   };
+  text = String(text).replace(/^\uFEFF/, "").replace(/^\s*"?sep=.?"?\r?\n/i, "");   // Excel-style "sep=," first line (Dragon Shield)
   const first = text.split(/\r?\n/,1)[0] || "";
-  if (first.includes(",") && /name/i.test(first)) {
-    const rows = parseCSV(text), head = rows.shift().map(h => h.trim().toLowerCase());
-    const ni = head.findIndex(h => h === "name" || h === "card name" || h === "card");
-    const qi = head.findIndex(h => ["quantity","qty","count","amount"].includes(h));
-    const col = (...names) => head.findIndex(h => names.includes(h));
-    const si = col("set code","set","edition code"), ci = col("collector number","card number","number","cn");
-    const fi = col("foil","finish","printing"), idi = col("scryfall id","scryfall_id");
+  const delim = [",", ";", "\t"].map(d => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const headGuess = first.split(delim).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ""));
+  const NAMES = ["name","card name","card","cardname","card_name","simple name","english name","product name"];
+  if (first.split(delim).length > 1 && headGuess.some(h => NAMES.includes(h))) {
+    const rows = parseCSV(text, delim), head = rows.shift().map(h => h.trim().toLowerCase());
+    // first matching alias wins, so "set code" beats "set" (which some apps fill with the set's full name)
+    const col = (...names) => { for (const n of names) { const i = head.indexOf(n); if (i >= 0) return i; } return -1; };
+    const ni = col(...NAMES);
+    const qi = col("quantity","qty","count","amount","total quantity","have","owned","copies");
+    const si = col("set code","setcode","set_code","edition code","expansion code","code","set","edition");
+    const ci = col("collector number","collector_number","collectornumber","card number","number","cn","collector #","card #","no.");
+    const fi = col("foil","printing","finish","foil/variant","is foil","variant"), idi = col("scryfall id","scryfall_id","scryfallid","scryfall uuid");
     const bi = head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) >= 0 ? head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) : col("binder","list","deck","folder");
     const bti = head.findIndex(h => /binder|list|deck|folder/.test(h) && /type/.test(h));
     for (const r of rows) {
       const f = fi >= 0 ? String(r[fi] || "").trim().toLowerCase() : "";
-      const finish = f === "etched" ? "etched" : ["foil","true","yes"].includes(f) ? "foil" : "normal";
-      const set = si >= 0 ? String(r[si] || "").trim().toLowerCase() : "", cn = ci >= 0 ? String(r[ci] || "").trim() : "";
+      const finish = /etched/.test(f) ? "etched" : (/^(foil|true|yes|y|1)$/.test(f) || (/\bfoil\b/.test(f) && !/non-?foil|normal/.test(f))) ? "foil" : "normal";
+      let set = si >= 0 ? String(r[si] || "").trim().toLowerCase() : "";
+      if (!/^[a-z0-9]{2,6}$/.test(set)) set = "";   // a set name rather than a code
+      const cn = ci >= 0 ? String(r[ci] || "").trim().replace(/^#/, "") : "";
       const id = idi >= 0 ? String(r[idi] || "").trim() : "";
       const ix = add(r[ni], qi >= 0 ? r[qi] : 1, (set && cn) || id ? { id, set, cn, finish } : null);
       const bn = bi >= 0 ? String(r[bi] || "").trim() : "";
@@ -573,6 +655,7 @@ async function applyImport(merge){
   const next = merge ? new Map(S.coll) : new Map();
   for (const [i,q] of res.out) next.set(i, (next.get(i)||0) + q);
   S.prints = mergePrints(merge ? S.prints : [], res.prints || []); savePrints();
+  applyBinderPlaces(res.binders, merge);
   S.coll = next; S.updatedAt = Date.now(); S.pending = null;
   $("#importPreview").innerHTML = `<div class="notice ok">Collection saved.</div>`;
   for (const [name, b] of picked) deckFromCards(name, b.cards, { source:"manabox", built:true });
@@ -598,7 +681,7 @@ function restoreLocal(){
   S.decks = LS.get("dw.decks") || [];
   S.prints = LS.get("dw.prints") || []; indexPrints();
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
-  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || [];
+  S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || []; S.loc = LS.get("dw.loc") || {}; S.scan = LS.get("dw.scan") || [];
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -636,6 +719,7 @@ async function syncFromServer(){
 }
 async function saveDeck(d){
   d.saved = true;
+  recordVersion(d);
   S.decks = [d, ...S.decks.filter(x => x.id !== d.id)];
   LS.set("dw.decks", S.decks);
   if (S.db && S.uid) { try { await S.db.doc(`data/users/${S.uid}/deck-${d.id}`).set({ kind:"deck", deck:d }); } catch(e){ console.warn(e); } }
@@ -654,11 +738,11 @@ function renderCollection(){
   const total = [...S.coll.values()].reduce((a,b)=>a+b,0);
   if (!S.coll.size) {
     $("#collStats").innerHTML = ""; $("#colorBreak").innerHTML = ""; $("#typeFilter").innerHTML = ""; $("#collMore").innerHTML = "";
-    $("#collTools").hidden = true; $("#collValue").innerHTML = ""; $("#tradePanel").hidden = true;
+    $("#collTools").hidden = true; $("#locTools").hidden = true; $("#statsPanel").hidden = true; $("#collValue").innerHTML = ""; $("#tradePanel").hidden = true;
     $("#collList").innerHTML = `<div class="empty"><h3>No cards yet</h3><p class="muted small">Import your ManaBox export above. Your collection is saved on this device. Use Backup in Settings to move it to another one.</p></div>`;
     return;
   }
-  $("#collTools").hidden = false; renderValue();
+  $("#collTools").hidden = false; $("#locTools").hidden = false; $("#statsPanel").hidden = false; renderValue();
   const byColor = {W:0,U:0,B:0,R:0,G:0,M:0,C:0}; let cmd = 0;
   for (const [i,q] of S.coll) { const c = card(i), id = c[C.col]; if (!id) byColor.C += q; else if (id.length > 1) byColor.M += q; else byColor[id] += q; if (canCommand(c)) cmd++; }
   $("#collStats").innerHTML = `<div class="stat"><span class="label">Cards</span><b>${total.toLocaleString()}</b></div><div class="stat"><span class="label">Different</span><b>${S.coll.size.toLocaleString()}</b></div><div class="stat"><span class="label">Commanders</span><b>${cmd}</b></div>`;
@@ -671,9 +755,11 @@ function renderCollection(){
     const c = card(i);
     if (S.filter.type === "Commanders") { if (!canCommand(c)) return false; }
     else if (S.filter.type !== "All" && !c[C.type].includes(S.filter.type)) return false;
+    if (S.filter.loc && !atPlace(c[C.name], S.filter.loc)) return false;
     if (q && !norm(c[C.name]).includes(q) && !c[C.type].toLowerCase().includes(ql) && !c[C.text].toLowerCase().includes(ql)) return false;
     return true;
   }).sort(S.filter.sort === "value" ? (a,b) => ownedValue(b[0]) - ownedValue(a[0]) : (a,b) => card(a[0])[C.name].localeCompare(card(b[0])[C.name]));
+  S._rows = rows; renderLocFilter(); renderStatsIfOpen();
   const shown = rows.slice(0, S.shown);
   $("#collList").innerHTML = shown.length ? shown.map(([i,qty]) => { const u = S._useAll.get(card(i)[C.name])?.q || 0; return cardRow(i, qty, u ? `${u} in built decks` : "", ownedValue(i)); }).join("") : `<p class="muted small">No cards match.</p>`;
   bindCardRows($("#collList"));
@@ -685,17 +771,42 @@ function cardRow(i, qty, role, price){
   const c = card(i);
   return `<div class="card"><span class="q">${qty}×</span><button class="n" data-i="${i}" aria-expanded="false">${esc(c[C.name])}${role?`<span class="role">${esc(role)}</span>`:""}</button><span class="cost">${pips(c[C.cost])}</span><span class="t">${esc(c[C.type])}${c[C.pt]?` · ${esc(c[C.pt])}`:""}${price > 0 ? ` · <span class="price">${money(price)}</span>` : ""}</span></div>`;
 }
+// One image per printing you own; swipe (or use the arrows) to move between them.
+function cardGallery(c){
+  const name = c[C.name], i = lookup(name);
+  const seen = new Map();
+  for (const p of S.printsByName?.get(name) || []) {
+    if (!p.set || !p.cn) continue;
+    const k = `${p.set}|${p.cn}|${p.finish}`;
+    if (seen.has(k)) seen.get(k).qty += p.qty; else seen.set(k, { ...p });
+  }
+  const prints = [...seen.values()].sort((a, b) => printPrice(b, i) - printPrice(a, i));
+  const slides = prints.length ? prints : [null];
+  const setNames = LS.get("dw.sets")?.sets || {};
+  const wrap = document.createElement("div"); wrap.className = "gallery";
+  wrap.innerHTML = `<div class="gtrack" tabindex="0" aria-label="${esc(name)}${prints.length > 1 ? `, ${prints.length} printings you own. Swipe or use the arrow keys to see them.` : ""}">${slides.map(p => {
+      const src = p ? `https://api.scryfall.com/cards/${encodeURIComponent(p.set)}/${encodeURIComponent(p.cn)}?format=image&version=normal`
+        : `https://api.scryfall.com/cards/named?format=image&version=normal&exact=${encodeURIComponent(name.split(" // ")[0])}`;
+      const cap = p ? `${esc(setNames[p.set]?.[0] || p.set.toUpperCase())} · #${esc(p.cn)}${p.finish !== "normal" ? ` · <b>${p.finish === "etched" ? "Etched foil" : "Foil"}</b>` : ""} · ${p.qty} cop${p.qty === 1 ? "y" : "ies"} · <span class="price">${money(printPrice(p, i))}</span>` : "";
+      return `<figure class="gslide"><img class="cardimg${p && p.finish !== "normal" ? " foil" : ""}" loading="lazy" alt="${esc(name)}${p ? ", " + esc(p.set.toUpperCase()) + " printing" : ""}" src="${src}">${cap ? `<figcaption class="small">${cap}</figcaption>` : ""}</figure>`;
+    }).join("")}</div>
+    ${slides.length > 1 ? `<div class="gnav"><button class="ghost mini" data-g="-1" aria-label="Previous printing">‹</button><span class="small muted gcount">1 of ${slides.length}</span><button class="ghost mini" data-g="1" aria-label="Next printing">›</button></div>` : ""}`;
+  const track = wrap.querySelector(".gtrack"), count = wrap.querySelector(".gcount");
+  const go = dir => track.scrollBy({ left:dir * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  track.addEventListener("scroll", () => requestAnimationFrame(() => { if (count) count.textContent = `${Math.round(track.scrollLeft / track.clientWidth) + 1} of ${slides.length}`; }), { passive:true });
+  wrap.querySelectorAll("[data-g]").forEach(b => b.onclick = () => go(+b.dataset.g));
+  track.addEventListener("keydown", e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); go(e.key === "ArrowRight" ? 1 : -1); } });
+  wrap.querySelectorAll("img").forEach(img => img.onerror = () => { if (slides.length === 1 && !prints.length) wrap.remove(); else img.style.visibility = "hidden"; });
+  return wrap;
+}
 function bindCardRows(root){
   root.querySelectorAll("button.n").forEach(b => b.onclick = () => {
     const row = b.parentElement, open = row.querySelector(".detail");
     if (open) { open.remove(); b.setAttribute("aria-expanded","false"); return; }
     const c = card(+b.dataset.i), d = document.createElement("div");
     d.className = "detail";
-    const img = document.createElement("img"); img.className = "cardimg"; img.loading = "lazy"; img.alt = c[C.name];
-    img.src = "https://api.scryfall.com/cards/named?format=image&version=normal&exact=" + encodeURIComponent(c[C.name].split(" // ")[0]);
-    img.onerror = () => img.remove();
     const p = document.createElement("p"); p.textContent = c[C.text] || "No rules text.";
-    d.append(img, p); row.appendChild(d); b.setAttribute("aria-expanded","true");
+    d.append(cardGallery(c), p); const pe = placeEditor(c); if (pe) d.append(pe); row.appendChild(d); b.setAttribute("aria-expanded","true");
   });
 }
 let searchT; $("#collSearch").addEventListener("input", e => { clearTimeout(searchT); searchT = setTimeout(() => { S.filter.q = e.target.value; S.shown = 120; renderCollection(); }, 150); });
@@ -935,7 +1046,7 @@ async function tweak(request){
   try {
     const res = await runDeckCall(o, extra);
     const nd = toDeck(o, res, d.saved ? d.id : null);
-    nd.saved = false; nd.built = !!d.built; S.current = nd; renderDeck();
+    nd.saved = false; nd.built = !!d.built; nd.versions = d.versions; nd.pulled = d.pulled; nd._note = "Claude: " + request; S.current = nd; renderDeck();
     if (d.saved) await saveDeck(nd);
   } catch (e) {
     if (e?.code !== "cancelled") { const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
@@ -1017,7 +1128,18 @@ function renderDeck(){
     <h3>Share</h3>
     <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button></div>
     <div id="shareOut"></div>
-  </div>`;
+  </div>
+  <div class="panel">
+    <h3>Mana base</h3>
+    <div id="manaOut"></div>
+  </div>
+  ${d.saved ? `<div class="panel">
+    <h3>${d.built ? "Unbuild" : "Pull list"}</h3>
+    <p class="small muted">${d.built ? "Taking this deck apart? See where each card goes back, then free its cards for other decks." : "Gather this deck's cards, ticking them off as you go. Tick everything and it's marked as built."}</p>
+    <div class="row"><button class="grow" id="pullBtn">${d.built ? "Show where cards go back" : (Object.keys(d.pulled || {}).length ? "Continue pull list" : "Start pull list")}</button></div>
+    <div id="pullOut"></div>
+  </div>` : ""}
+  ${(d.versions || []).length ? `<div class="panel"><h3>History <span class="num muted">${d.versions.length} version${d.versions.length === 1 ? "" : "s"}</span></h3><div id="histOut"></div></div>` : ""}`;
   bindCardRows(view);
   $("#deckBuilt").onchange = e => setBuilt(d, e.target.checked);
   $("#renameBtn").onclick = () => renameDeck(d);
@@ -1025,6 +1147,9 @@ function renderDeck(){
   $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
   $("#shareBtn").onclick = () => shareDeck(d);
   $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
+  manaPanel($("#manaOut"), deckEntries(d).filter(([n]) => n !== d.commander).concat(Object.entries(d.basics || {})), d.commander, d.format);
+  if ($("#pullBtn")) $("#pullBtn").onclick = () => d.built ? unbuildPanel(d) : pullPanel(d);
+  if ($("#histOut")) renderHistory(d);
   $("#saveDeckBtn").onclick = async () => { await saveDeck(S.current); $("#saveDeckBtn").textContent = "Saved"; };
   $("#copyBtn").onclick = () => {
     const t = deckText(d);
@@ -1132,6 +1257,7 @@ function renderCheck(){
     <div class="row btnrow">
       ${missing.length ? `<button class="grow" id="copyNeedBtn">Copy shopping list</button>` : ""}
       ${missing.length ? `<button class="grow" id="wishCheckBtn">Add missing to wishlist</button>` : ""}
+      <button class="grow" id="manaCheckBtn">Mana base</button>
       <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
       <button class="primary grow" id="evalBtn">${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
@@ -1139,6 +1265,7 @@ function renderCheck(){
     <textarea id="needArea" hidden readonly></textarea>
     <div id="evalMsg"></div>
     <div id="checkBracket"></div>
+    <div id="checkMana"></div>
   </div>
   <div class="panel" id="evalProgress" hidden><div class="progress"><div class="spin"></div><div class="grow"><b>Claude is reviewing the deck</b><div class="stream" id="evalStream"></div></div><button class="ghost" id="evalStop">Stop</button></div></div>
   ${ev ? evalHTML(ev) : ""}
@@ -1158,6 +1285,7 @@ function renderCheck(){
   $("#evalBtn").onclick = evaluateDeck;
   $("#saveCheckBtn").onclick = saveCheckAsDeck;
   if ($("#wishCheckBtn")) $("#wishCheckBtn").onclick = () => { const n = addToWish(missing.map(r => [card(r.i)[C.name], r.missing])); $("#evalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist on the Collection tab.</div>`; };
+  $("#manaCheckBtn").onclick = () => { const cmd = k.commanders.length ? card(k.commanders[0])[C.name] : null; manaPanel($("#checkMana"), k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]), cmd, k.fmt); };
   $("#bracketCheckBtn").onclick = () => { const cmd = k.commanders.length ? card(k.commanders[0])[C.name] : null; bracketPanel($("#checkBracket"), k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]), cmd, k.fmt, null); };
   if (!S.sample) $("#evalBtn").onclick = () => showKeyNeeded("#evalMsg");
   if ($("#useSubsBtn")) $("#useSubsBtn").onclick = buildFromCheck;
@@ -1361,6 +1489,9 @@ function deckFromCards(name, cmap, opts = {}){
     cards, basics, warnings:[], total,
     opts:{ fmt, power:"focused", theme:"", depth:"default", basicsUnlimited:true, colors:"", freeOnly:true },
     createdAt: existing?.createdAt || Date.now(), saved:true, built: existing ? existing.built : !!opts.built, source: opts.source || "" };
+  d.versions = existing?.versions || [];
+  d._note = { manabox:"Imported from ManaBox", check:"Saved from the Check tab", shared:"Shared with you" }[opts.source] || "First saved";
+  recordVersion(d);
   S.decks = [d, ...S.decks.filter(x => x.id !== d.id)];
   LS.set("dw.decks", S.decks);
   return d;
@@ -1524,7 +1655,7 @@ ${lines.join("\n")}`;
       }
       d.cards = d.cards.filter(c => c.qty > 0);
       d.total = d.cards.reduce((a, c) => a + c.qty, 0) + Object.values(d.basics).reduce((a, b) => a + b, 0) + (d.commander ? 1 : 0);
-      S.current = d;
+      S.current = d; d._note = `Budget upgrades (${fit.length})`;
       if (d.saved) await saveDeck(d);
       renderDeck();
       $("#tweakMsg").innerHTML = `<div class="notice ok">Applied ${fit.length} upgrade${fit.length === 1 ? "" : "s"}. New cards are marked "upgrade".</div>`;
@@ -1621,7 +1752,7 @@ function lnC(n, k){ if (k < 0 || k > n) return -Infinity; let s = 0; for (let j 
 function hyp(N, K, n, k){ return Math.exp(lnC(K, k) + lnC(N - K, n - k) - lnC(N, n)); }
 function atLeast(N, K, n, k){ let p = 0; for (let j = k; j <= Math.min(K, n); j++) p += hyp(N, K, n, j); return Math.min(1, p); }
 const pct = p => (p * 100).toFixed(p >= 0.995 || p < 0.005 ? 0 : 0) + "%";
-function renderPlay(){ renderDrawSelect(); renderDraw(); renderDrawStats(); renderLife(); renderRecords(); }
+function renderPlay(){ renderDrawSelect(); renderDraw(); renderDrawStats(); renderLife(); renderRecords(); renderGameNight(); }
 function renderDrawSelect(){
   const sel = $("#drawDeck"), cur = S.draw?.src || sel.value, o = drawSources();
   sel.innerHTML = o.length ? o.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("") : `<option value="">No decks yet</option>`;
@@ -1732,7 +1863,7 @@ $("#lifeWin").onclick = () => {
   $("#lifeMsg").querySelectorAll("[data-win]").forEach(b => b.onclick = () => {
     if (b.dataset.win === "x") { $("#lifeMsg").innerHTML = ""; return; }
     const w = +b.dataset.win;
-    S.games.push({ date:new Date().toISOString(), players:L.players.map(p => ({ name:p.name, deckId:p.deck || null })), winner:w });
+    S.games.push({ date:new Date().toISOString(), players:L.players.map(p => ({ name:p.name, deckId:p.deck || null, v:(S.decks.find(x => x.id === p.deck)?.versions || []).length || null })), winner:w });
     LS.set("dw.games", S.games);
     const noDeck = L.players.every(p => !p.deck);
     $("#lifeMsg").innerHTML = `<div class="notice ok">Recorded: ${esc(L.players[w].name)} won.${noDeck ? " Pick decks under each player next time to track deck records." : ""}</div>`;
@@ -1758,6 +1889,453 @@ function renderRecords(){
     S.games.pop(); LS.set("dw.games", S.games); renderRecords(); renderSaved();
   };
 }
+
+/* ================= camera scanning ================= */
+let scanStream = null, scanBusy = 0;
+function stopScan(){ if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const cam = $("#scanCam"); if (cam) cam.hidden = true; const st = $("#scanStart"); if (st) st.hidden = false; }
+$("#scanStart").onclick = async () => {
+  if (!S.sample) return showKeyNeeded("#scanStatus");
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
+    $("#scanVideo").srcObject = scanStream; $("#scanCam").hidden = false; $("#scanStart").hidden = true; $("#scanStatus").innerHTML = "";
+  } catch (e) {
+    console.warn(e);
+    $("#scanStatus").innerHTML = `<div class="notice warn">The camera didn't start. Allow camera access for this site in your browser settings, or use <b>Use a photo</b> instead.</div>`;
+  }
+};
+$("#scanStop").onclick = stopScan;
+function frameToJpeg(source, w, h){
+  const scale = Math.min(1, 1400 / Math.max(w, h)), c = document.createElement("canvas");
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+$("#scanSnap").onclick = () => {
+  const v = $("#scanVideo"); if (!v.videoWidth) return;
+  scanImage(frameToJpeg(v, v.videoWidth, v.videoHeight), $("#scanFoil").checked);
+};
+$("#scanFile").addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  if (!S.sample) return showKeyNeeded("#scanStatus");
+  const img = new Image(); img.onload = () => { scanImage(frameToJpeg(img, img.naturalWidth, img.naturalHeight), $("#scanFoil").checked); URL.revokeObjectURL(img.src); };
+  img.onerror = () => { $("#scanStatus").innerHTML = `<div class="notice bad">That photo couldn't be opened.</div>`; };
+  img.src = URL.createObjectURL(f);
+});
+function scanSay(){ $("#scanStatus").innerHTML = scanBusy ? `<div class="progress" style="margin-top:8px"><div class="spin"></div><span>Reading ${scanBusy} card photo${scanBusy > 1 ? "s" : ""}… you can keep scanning.</span></div>` : ""; }
+async function scanImage(data, foil){
+  scanBusy++; scanSay();
+  try {
+    const r = await S.sample.json(`This photo shows one or more Magic: The Gathering cards. Identify each card that is clearly visible.
+For each card give: the exact English card name (for double-faced cards, the front face), the set code and collector number printed at the bottom left if you can read them, and how confident you are in the name.
+If the card is in another language, give its English name. Skip tokens, art cards and card backs.
+Reply with only JSON: {"cards":[{"name":"","set":"","collector_number":"","confidence":"high"}]}
+Use "" for anything you can't read, and confidence "high", "medium" or "low". If no card is visible, return {"cards":[]}.`, { modelTier:"default", cache:false, images:[{ media_type:"image/jpeg", data }] });
+    const found = Array.isArray(r?.cards) ? r.cards : [];
+    if (!found.length) { $("#scanStatus").innerHTML = ""; flashScan("No card found in that photo. Try again with the card filling more of the frame.", "warn"); return; }
+    for (const x of found) await addScanned(x, foil);
+  } catch (e) {
+    flashScan(errText(e), "bad");
+  } finally { scanBusy--; scanSay(); }
+}
+function flashScan(t, k){ const b = document.createElement("div"); b.className = `notice ${k}`; b.textContent = t; $("#scanStatus").after(b); setTimeout(() => b.remove(), 6000); }
+async function addScanned(x, foil){
+  let i = lookup(x.name), set = String(x.set || "").trim().toLowerCase(), cn = String(x.collector_number || "").trim().replace(/^#/, "").replace(/^0+(?=\d)/, "");
+  let unsure = x.confidence && x.confidence !== "high";
+  if (i < 0 && x.name) {
+    try { const r = await sfFetch("https://api.scryfall.com/cards/named?fuzzy=" + encodeURIComponent(x.name)); if (r.ok) { const d = await r.json(); i = lookup(d.name); unsure = true; } } catch {}
+  }
+  if (i < 0) { flashScan(`Couldn't match "${x.name || "a card"}" to a real card. Try scanning it again.`, "warn"); return; }
+  const name = card(i)[C.name];
+  if (!/^[a-z0-9]{2,6}$/.test(set) || !cn) { set = ""; cn = ""; }
+  if (set) {   // check the printing exists and is this card
+    try { const r = await sfFetch(`https://api.scryfall.com/cards/${encodeURIComponent(set)}/${encodeURIComponent(cn)}`); if (r.ok) { const d = await r.json(); if (lookup(d.name) !== i) { set = ""; cn = ""; } } else { set = ""; cn = ""; } }
+    catch { /* offline: keep what Claude read */ }
+  }
+  const finish = foil ? "foil" : "normal";
+  const same = S.scan.find(s => s.name === name && s.set === set && s.cn === cn && s.finish === finish);
+  if (same) same.qty++; else S.scan.unshift({ name, set, cn, finish, qty:1, unsure });
+  LS.set("dw.scan", S.scan); renderScanList();
+}
+function renderScanList(){
+  const box = $("#scanList"); if (!box || !S.scan) return;
+  if (!S.scan.length) { box.innerHTML = ""; return; }
+  const n = S.scan.reduce((a, s) => a + s.qty, 0);
+  box.innerHTML = `<h3 style="margin-top:10px">Scanned <span class="num muted">${n}</span></h3>
+    <div>${S.scan.map((s, k) => `<div class="scanitem"><span><b>${esc(s.name)}</b>${s.unsure ? ` <span class="flag small">check this</span>` : ""}<br><span class="small muted">${s.set ? `${esc(s.set.toUpperCase())} #${esc(s.cn)}` : "printing not read"}${s.finish === "foil" ? " · Foil" : ""}</span></span>
+      <span class="qty"><button class="mini ghost" data-sq="${k}" data-d="-1" aria-label="One fewer">−</button><b>${s.qty}</b><button class="mini ghost" data-sq="${k}" data-d="1" aria-label="One more">+</button><button class="mini ghost" data-sf="${k}" aria-label="Toggle foil">${s.finish === "foil" ? "Foil" : "Non-foil"}</button></span></div>`).join("")}</div>
+    <div class="row btnrow" style="margin-top:8px"><button class="primary" id="scanAdd">Add ${n} card${n === 1 ? "" : "s"} to my collection</button><button class="ghost danger" id="scanClear">Clear list</button></div>`;
+  box.querySelectorAll("[data-sq]").forEach(b => b.onclick = () => { const s = S.scan[+b.dataset.sq]; s.qty += +b.dataset.d; if (s.qty <= 0) S.scan.splice(+b.dataset.sq, 1); LS.set("dw.scan", S.scan); renderScanList(); });
+  box.querySelectorAll("[data-sf]").forEach(b => b.onclick = () => { const s = S.scan[+b.dataset.sf]; s.finish = s.finish === "foil" ? "normal" : "foil"; LS.set("dw.scan", S.scan); renderScanList(); });
+  $("#scanAdd").onclick = async () => {
+    const prints = [];
+    for (const s of S.scan) { const i = lookup(s.name); if (i < 0) continue; S.coll.set(i, (S.coll.get(i) || 0) + s.qty); if (s.set) prints.push({ id:"", set:s.set, cn:s.cn, finish:s.finish, name:s.name, qty:s.qty }); }
+    S.prints = mergePrints(S.prints || [], prints); savePrints();
+    S.updatedAt = Date.now(); S.scan = []; LS.set("dw.scan", S.scan);
+    await persistCollection(); renderAll();
+    flashScan(`Added to your collection.`, "ok");
+  };
+  $("#scanClear").onclick = () => { const b = $("#scanClear"); if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to clear"; return; } S.scan = []; LS.set("dw.scan", S.scan); renderScanList(); };
+}
+
+/* ================= card places ================= */
+function placeOf(name){ return Object.entries(S.loc?.[name] || {}); }
+function allPlaces(){ const s = new Set(); for (const m of Object.values(S.loc || {})) for (const p of Object.keys(m)) s.add(p); return [...s].sort((a, b) => a.localeCompare(b)); }
+function placedCount(name){ return placeOf(name).reduce((a, [, q]) => a + q, 0) + ((S._useAll || useMap()).get(name)?.q || 0); }
+function atPlace(name, place){
+  if (place === "__none") { const i = lookup(name); return (S.coll.get(i) || 0) > placedCount(name); }
+  if (place.startsWith("deck:")) return ((S._useAll || useMap()).get(name)?.decks || []).includes(place.slice(5));
+  return (S.loc?.[name]?.[place] || 0) > 0;
+}
+function setPlace(name, place, qty){
+  S.loc[name] = S.loc[name] || {};
+  if (qty > 0) S.loc[name][place] = qty; else delete S.loc[name][place];
+  if (!Object.keys(S.loc[name]).length) delete S.loc[name];
+  LS.set("dw.loc", S.loc);
+}
+function renderPlaceList(){ $("#placeList").innerHTML = allPlaces().map(p => `<option value="${esc(p)}"></option>`).join(""); }
+function applyBinderPlaces(binders, merge){
+  if (!binders || !binders.size) return;
+  if (!merge) S.loc = {};
+  for (const [bn, b] of binders) {
+    if (/^all$/i.test(bn.trim())) continue;   // ManaBox's catch-all binder isn't a real place
+    for (const [i, q] of b.cards) { const n = card(i)[C.name]; S.loc[n] = S.loc[n] || {}; S.loc[n][bn] = (S.loc[n][bn] || 0) + q; }
+  }
+  LS.set("dw.loc", S.loc);
+}
+function placeEditor(c){
+  const name = c[C.name], own = S.coll.get(lookup(name)) || 0; if (!own) return null;
+  const el = document.createElement("div"); el.className = "where";
+  const draw = () => {
+    const pl = placeOf(name), dk = (S._useAll || useMap()).get(name), placed = placedCount(name);
+    const parts = [...pl.map(([p, q]) => `${esc(p)} ×${q}`), ...(dk ? dk.decks.map(n => `${esc(n)} <span class="muted">(built deck)</span>`) : []), own > placed ? `<span class="muted">not placed ×${own - placed}</span>` : ""].filter(Boolean);
+    el.innerHTML = `<p class="small"><span class="label">Where</span> ${parts.join(" · ")}</p>
+      <div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" list="placeList" placeholder="Binder, box or shelf" aria-label="Place" style="flex:1"><input type="number" inputmode="numeric" min="0" max="${own}" value="${Math.max(1, own - placed)}" aria-label="Copies" style="width:4.2em;flex:none"><button class="mini">Put here</button></div>`;
+    const [pIn, qIn] = el.querySelectorAll("input");
+    el.querySelector("button").onclick = () => { const p = pIn.value.trim(); if (!p) { pIn.focus(); return; } setPlace(name, p, Math.min(own, Math.max(0, parseInt(qIn.value, 10) || 0))); renderPlaceList(); draw(); };
+  };
+  draw(); return el;
+}
+function renderLocFilter(){
+  const sel = $("#collLoc"); if (!sel) return;
+  const pl = allPlaces(), decks = S.decks.filter(d => d.built).map(d => d.name);
+  const cur = S.filter.loc || "";
+  sel.innerHTML = `<option value="">Everywhere</option><option value="__none">Not placed yet</option>${pl.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("")}${decks.map(n => `<option value="deck:${esc(n)}">In deck: ${esc(n)}</option>`).join("")}`;
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+  renderPlaceList();
+}
+$("#collLoc").onchange = e => { S.filter.loc = e.target.value; S.shown = 120; renderCollection(); };
+$("#locBulkBtn").onclick = () => {
+  const n = (S._rows || []).length;
+  $("#locBulk").innerHTML = `<div class="notice"><b>Put the ${n.toLocaleString()} card${n === 1 ? "" : "s"} shown in one place.</b> Copies in built decks stay put. Use search, type or place filters first to pick the cards.
+    <div class="row" style="margin-top:8px;gap:6px"><input type="text" id="bulkPlace" list="placeList" placeholder="Binder, box or shelf" style="flex:1"><button class="primary mini" id="bulkGo">Put them here</button><button class="ghost mini" id="bulkX">Cancel</button></div></div>`;
+  $("#bulkX").onclick = () => { $("#locBulk").innerHTML = ""; };
+  $("#bulkGo").onclick = () => {
+    const p = $("#bulkPlace").value.trim(); if (!p) return;
+    const used = S._useAll || useMap();
+    for (const [i, q] of S._rows || []) { const name = card(i)[C.name], free = q - (used.get(name)?.q || 0); delete S.loc[name]; if (free > 0) S.loc[name] = { [p]: free }; }
+    LS.set("dw.loc", S.loc); $("#locBulk").innerHTML = `<div class="notice ok">Done. Those cards are now in ${esc(p)}.</div>`; renderCollection();
+  };
+};
+
+/* ================= collection stats ================= */
+function bars(rows, fmt = v => v.toLocaleString()){
+  const max = Math.max(1, ...rows.map(r => r.v));
+  return `<div class="bars">${rows.map(r => `<div class="barrow" title="${esc(r.label)}: ${esc(fmt(r.v))}"><span>${r.html || esc(r.label)}</span><span class="bt"><i style="width:${(r.v / max * 100).toFixed(1)}%"></i></span><span class="bv">${esc(fmt(r.v))}</span></div>`).join("")}</div>`;
+}
+function renderStatsIfOpen(){ if ($("#statsDetails")?.open) renderStats(); }
+$("#statsDetails").addEventListener("toggle", renderStatsIfOpen);
+function renderStats(){
+  const box = $("#statsOut"); if (!S.coll.size) { box.innerHTML = ""; return; }
+  const used = S._useAll || useMap();
+  let total = 0, inDecks = 0, cards = 0;
+  const col = { W:0, U:0, B:0, R:0, G:0, M:0, C:0 }, types = {}, curve = new Array(8).fill(0), buckets = [0, 0, 0, 0, 0], bucketV = [0, 0, 0, 0, 0];
+  const TY = ["Creature","Instant","Sorcery","Artifact","Enchantment","Planeswalker","Battle","Land"];
+  const top = [];
+  for (const [i, q] of S.coll) {
+    const c = card(i), unit = unitOwned(i), v = unit * q;
+    cards += q; total += v; inDecks += Math.min(q, used.get(c[C.name])?.q || 0) * unit;
+    const id = c[C.col]; if (isLand(c)) {} else if (!id) col.C += q; else if (id.length > 1) col.M += q; else col[id] += q;
+    const t = TY.find(t => new RegExp("\\b" + t + "\\b").test(c[C.type])) || "Other"; types[t] = (types[t] || 0) + q;
+    if (!isLand(c)) curve[Math.min(7, Math.floor(c[C.cmc]))] += q;
+    const b = unit < 1 ? 0 : unit < 5 ? 1 : unit < 20 ? 2 : unit < 50 ? 3 : 4; buckets[b] += q; bucketV[b] += v;
+    top.push([i, unit]);
+  }
+  top.sort((a, b) => b[1] - a[1]);
+  const sets = new Map(); for (const p of S.prints || []) if (p.set) sets.set(p.set, (sets.get(p.set) || 0) + p.qty);
+  const setNames = LS.get("dw.sets")?.sets || {};
+  const maxC = Math.max(1, ...curve);
+  box.innerHTML = `
+    <div class="stats"><div class="stat"><span class="label">Total value</span><b>${money(total)}</b></div><div class="stat"><span class="label">In built decks</span><b>${money(inDecks)}</b></div><div class="stat"><span class="label">Not in a deck</span><b>${money(total - inDecks)}</b></div></div>
+    <div><h3>Colors <span class="small muted">(nonland cards)</span></h3>${bars([...COLORS.map(x => ({ label:CNAME[x], html:`<span class="pip ${x}"></span> ${CNAME[x]}`, v:col[x] })), { label:"Multicolor", v:col.M }, { label:"Colorless", v:col.C }])}</div>
+    <div><h3>Card types</h3>${bars([...TY, "Other"].filter(t => types[t]).map(t => ({ label:t, v:types[t] })).sort((a, b) => b.v - a.v))}</div>
+    <div><h3>Mana values <span class="small muted">(nonland cards)</span></h3><div class="curve" role="img" aria-label="Number of cards at each mana value">${curve.map((n, k) => `<div class="bar" title="Mana value ${k === 7 ? "7+" : k}: ${n}"><b>${n || ""}</b><i style="height:${n / maxC * 80}%"></i><span>${k === 7 ? "7+" : k}</span></div>`).join("")}</div></div>
+    <div><h3>Card values</h3>${bars(["Under $1", "$1 to $5", "$5 to $20", "$20 to $50", "$50 and up"].map((l, k) => ({ label:l, v:buckets[k], html:`${l} <span class="muted small">${money(bucketV[k])}</span>` })))}</div>
+    <div><h3>Most valuable</h3><div class="list">${top.slice(0, 10).map(([i, u]) => cardRow(i, S.coll.get(i), "", u * S.coll.get(i))).join("")}</div></div>
+    ${sets.size ? `<div><h3>Most collected sets</h3>${bars([...sets].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([s, n]) => ({ label:setNames[s]?.[0] || s.toUpperCase(), v:n })))}</div>` : ""}`;
+  bindCardRows(box);
+}
+
+/* ================= mana base ================= */
+const BASIC_TYPES = [["W","Plains"],["U","Island"],["B","Swamp"],["R","Mountain"],["G","Forest"]];
+function landColors(c, ident){
+  const out = new Set(), t = c[C.text].split(" // ")[0], ty = c[C.type];
+  for (const [x, w] of BASIC_TYPES) if (new RegExp("\\b" + w + "\\b").test(ty)) out.add(x);
+  for (const s of t.split(/[.]/)) if (/\badd\b/i.test(s)) { for (const m of s.matchAll(/\{([WUBRG])\}/g)) out.add(m[1]); if (/any colou?r|any one colou?r|any type/i.test(s)) COLORS.forEach(x => out.add(x)); if (/commander's colou?r identity/i.test(s)) [...ident].forEach(x => out.add(x)); }
+  const f = t.match(/search your library for (?:an?|up to two) ([^.]*?)cards?/i);
+  if (f) { let any = true; for (const [x, w] of BASIC_TYPES) if (f[1].includes(w)) { out.add(x); any = false; } if (any && /basic land/i.test(f[1])) [...ident].forEach(x => out.add(x)); }
+  return out;
+}
+function needSources(N, k, turn, play){
+  const n = 7 + Math.max(0, turn - 1) + (play ? 0 : 1);
+  for (let s = k; s <= N; s++) if (atLeast(N, s, n, k) >= 0.9) return s;
+  return N;
+}
+function manaPanel(box, entries, commander, fmt){
+  const all = [...entries, ...(commander ? [[commander, 1]] : [])].map(([n, q]) => [lookup(n), q]).filter(([i]) => i >= 0);
+  if (!all.length) { box.innerHTML = ""; return; }
+  const isCmd = fmt === "commander", play = !isCmd;
+  const ident = commander ? card(lookup(commander))[C.id] : [...new Set(all.flatMap(([i]) => [...card(i)[C.id]]))].join("");
+  const N = all.reduce((a, [, q]) => a + q, 0) - (commander ? 1 : 0);
+  const lands = all.filter(([i]) => isLand(card(i))), spells = all.filter(([i]) => !isLand(card(i)));
+  const L = lands.reduce((a, [, q]) => a + q, 0);
+  const src = { W:0, U:0, B:0, R:0, G:0 }; let tapped = 0, maybeTapped = 0;
+  for (const [i, q] of lands) {
+    for (const x of landColors(card(i), ident)) if (src[x] != null) src[x] += q;
+    const t = card(i)[C.text];
+    if (/enters (the battlefield )?tapped/i.test(t)) { if (/unless|you may pay|if you control|if you don't/i.test(t)) maybeTapped += q; else tapped += q; }
+  }
+  const ramp = spells.filter(([i]) => /\badd\b[^.]*\{[WUBRGC]\}|add (one|two) mana|search your library for [^.]*land cards?[^.]*onto the battlefield/i.test(card(i)[C.text])).reduce((a, [, q]) => a + q, 0);
+  const mvs = spells.flatMap(([i, q]) => Array(q).fill(card(i)[C.cmc])), avg = mvs.length ? mvs.reduce((a, b) => a + b, 0) / mvs.length : 0;
+  let rec;
+  if (isCmd) rec = Math.max(33, Math.min(40, Math.round(38 - Math.max(0, ramp - 8) / 2 + (avg - 3.2) * 2)));
+  else rec = avg <= 1.8 ? 20 : avg <= 2.5 ? 22 : avg <= 3.2 ? 24 : 25;
+  const need = {};
+  for (const [i] of spells) {
+    const c = card(i), cost = c[C.cost].split(" // ")[0];
+    for (const x of COLORS) {
+      const k = (cost.match(new RegExp("\\{" + x + "\\}", "g")) || []).length; if (!k) continue;
+      const turn = Math.min(8, Math.max(Math.floor(c[C.cmc]) || 1, k));
+      const s = needSources(N, k, turn, play);
+      if (!need[x] || s > need[x].s) need[x] = { s, card:c[C.name], cost, turn, k };
+    }
+  }
+  const landChk = Math.abs(L - rec) <= 1 ? "ok" : Math.abs(L - rec) <= 3 ? "warn" : "bad";
+  const tapChk = tapped <= (isCmd ? 8 : 4) ? "ok" : tapped <= (isCmd ? 12 : 6) ? "warn" : "bad";
+  const word = { ok:"Good", warn:"A bit off", bad:"Needs work" };
+  box.innerHTML = `<div class="manarow"><span class="label">Lands</span><span>${L} lands <span class="muted small">(rule of thumb for this curve: about ${rec}${isCmd && ramp ? `, with ${ramp} ramp card${ramp === 1 ? "" : "s"}` : ""})</span></span><span class="chk-${landChk}">${word[landChk]}</span>
+      <span class="why">Average mana value of your spells is ${avg.toFixed(2)}.${L < rec - 1 ? " You may miss land drops." : L > rec + 1 ? " You may flood out." : ""}</span></div>
+    <div class="manarow"><span class="label">Tapped</span><span>${tapped} always enter tapped${maybeTapped ? `, ${maybeTapped} sometimes` : ""}</span><span class="chk-${tapChk}">${word[tapChk]}</span>${tapChk !== "ok" ? `<span class="why">Lots of tapped lands slow your early turns.</span>` : ""}</div>
+    ${COLORS.filter(x => need[x]).map(x => { const n = need[x], have = src[x], st = have >= n.s ? "ok" : have >= n.s - 2 ? "warn" : "bad";
+      return `<div class="manarow"><span class="pip ${x}" aria-label="${CNAME[x]}"></span><span>${have} ${CNAME[x].toLowerCase()} source${have === 1 ? "" : "s"}, about ${n.s} wanted</span><span class="chk-${st}">${word[st]}</span>
+        <span class="why">Hardest to cast: ${esc(n.card)} ${pips(n.cost)} needs ${n.k} ${CNAME[x].toLowerCase()} by turn ${n.turn}.</span></div>`; }).join("")}
+    <p class="small muted" style="margin-top:6px">"Wanted" is the number of lands making that color for a 90% chance to cast your most demanding card on curve${play ? " on the play" : ""}. Mana rocks and creatures that make mana help too but aren't counted.</p>`;
+}
+
+/* ================= pull list and unbuild ================= */
+function pullGroups(d, mode){
+  const rows = deckEntries(d).map(([n, q]) => { const i = lookup(n); return { n, q, i }; }).filter(r => r.i >= 0);
+  const key = r => {
+    if (mode === "place") { const pl = placeOf(r.n).filter(([p]) => true); return pl.length ? pl.map(([p]) => p).join(" / ") : "Not placed"; }
+    if (mode === "set") { const pr = (S.printsByName?.get(r.n) || []).filter(p => p.set); return pr.length ? [...new Set(pr.map(p => (LS.get("dw.sets")?.sets?.[p.set]?.[0]) || p.set.toUpperCase()))].join(" / ") : "Unknown set"; }
+    const id = card(r.i)[C.col]; return isLand(card(r.i)) ? "Lands" : !id ? "Colorless" : id.length > 1 ? "Multicolor" : CNAME[id];
+  };
+  const g = new Map(); for (const r of rows) { const k = key(r); if (!g.has(k)) g.set(k, []); g.get(k).push(r); }
+  return [...g].sort((a, b) => a[0].localeCompare(b[0]));
+}
+function pullPanel(d, mode){
+  const out = $("#pullOut"); d.pulled = d.pulled || {};
+  mode = mode || d.pullMode || (allPlaces().length ? "place" : "color"); d.pullMode = mode;
+  const groups = pullGroups(d, mode), all = groups.flatMap(([, r]) => r);
+  const done = all.filter(r => d.pulled[r.n]).length;
+  const basics = Object.entries(d.basics || {}).filter(([, q]) => q > 0);
+  out.innerHTML = `<div class="row" style="margin-top:8px;gap:6px"><span class="small muted">Sort by</span>${["place","set","color"].map(m => `<button class="chip" data-pm="${m}" aria-pressed="${m === mode}">${{ place:"Where it is", set:"Set", color:"Color" }[m]}</button>`).join("")}</div>
+    <p class="small" style="margin-top:8px"><b>${done}</b> of ${all.length} pulled</p><div class="meter"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div>
+    ${groups.map(([g, rows]) => `<p class="label" style="margin-top:12px">${esc(g)}</p>${rows.map(r => `<label class="pullrow ${d.pulled[r.n] ? "done" : ""}"><input type="checkbox" data-pull="${esc(r.n)}" ${d.pulled[r.n] ? "checked" : ""}><span>${r.q > 1 ? r.q + "× " : ""}${esc(r.n)}${(S.coll.get(r.i) || 0) < r.q ? ` <span class="flag small">not enough copies</span>` : ""}</span></label>`).join("")}`).join("")}
+    ${basics.length ? `<p class="small muted" style="margin-top:10px">Plus basic lands: ${basics.map(([n, q]) => `${q} ${esc(n)}`).join(", ")}</p>` : ""}
+    ${done === all.length && all.length ? `<div class="notice ok" style="margin-top:10px">Everything's pulled. <button class="primary mini" id="pullBuilt">Mark as built</button></div>` : ""}`;
+  out.querySelectorAll("[data-pm]").forEach(b => b.onclick = () => pullPanel(d, b.dataset.pm));
+  out.querySelectorAll("[data-pull]").forEach(cb => cb.onchange = () => { if (cb.checked) d.pulled[cb.dataset.pull] = 1; else delete d.pulled[cb.dataset.pull]; LS.set("dw.decks", S.decks); pullPanel(d, mode); });
+  if ($("#pullBuilt")) $("#pullBuilt").onclick = async () => { d.pulled = {}; await setBuilt(d, true); };
+}
+function unbuildPanel(d){
+  const out = $("#pullOut"), groups = pullGroups(d, "place");
+  out.innerHTML = `${groups.map(([g, rows]) => `<p class="label" style="margin-top:12px">${g === "Not placed" ? "No place recorded" : "Back to " + esc(g)}</p><p class="small">${rows.map(r => `${r.q > 1 ? r.q + "× " : ""}${esc(r.n)}`).join(", ")}</p>`).join("")}
+    <div class="row" style="margin-top:10px"><button class="primary grow" id="unbuildGo">Unbuild this deck</button></div>
+    <p class="small muted">The deck stays saved. Its cards just count as free again.</p>`;
+  $("#unbuildGo").onclick = async () => { await setBuilt(d, false); };
+}
+
+/* ================= deck history ================= */
+function deckSig(d){
+  const m = {}; if (d.commander) m["⌘" + d.commander] = 1;
+  for (const c of d.cards || []) m[c.name] = (m[c.name] || 0) + c.qty;
+  for (const [n, q] of Object.entries(d.basics || {})) if (q > 0) m[n] = (m[n] || 0) + q;
+  return m;
+}
+const sigKey = m => JSON.stringify(Object.entries(m).sort((a, b) => a[0].localeCompare(b[0])));
+function recordVersion(d){
+  d.versions = d.versions || [];
+  const sig = deckSig(d), last = d.versions[d.versions.length - 1];
+  if (last && sigKey(last.cards) === sigKey(sig)) { delete d._note; return; }
+  d.versions.push({ at:Date.now(), note:d._note || (last ? "Edited" : "First saved"), cards:sig });
+  if (d.versions.length > 30) d.versions.splice(1, d.versions.length - 30);
+  delete d._note;
+}
+function renderHistory(d){
+  const box = $("#histOut"), vs = d.versions || [];
+  const rec = k => { let w = 0, l = 0; for (const g of S.games || []) g.players.forEach((p, j) => { if (p.deckId === d.id && p.v === k + 1) { if (j === g.winner) w++; else l++; } }); return w + l ? ` · ${w}–${l}` : ""; };
+  box.innerHTML = vs.map((v, k) => ({ v, k })).reverse().map(({ v, k }) => {
+    const prev = k ? vs[k - 1].cards : {}, ins = [], outs = [];
+    for (const [n, q] of Object.entries(v.cards)) if (q > (prev[n] || 0)) ins.push(`${q - (prev[n] || 0) > 1 ? (q - (prev[n] || 0)) + " " : ""}${n.replace("⌘", "")}`);
+    for (const [n, q] of Object.entries(prev)) if (q > (v.cards[n] || 0)) outs.push(`${q - (v.cards[n] || 0) > 1 ? (q - (v.cards[n] || 0)) + " " : ""}${n.replace("⌘", "")}`);
+    return `<div class="vers"><span><b>${esc(v.note)}</b> <span class="small muted">${new Date(v.at).toLocaleString()}${rec(k)}${k === vs.length - 1 ? " · current" : ""}</span></span>
+      ${k ? `<span class="small">${ins.length ? `<span class="have">In:</span> ${esc(ins.slice(0, 12).join(", "))}${ins.length > 12 ? "…" : ""}` : ""}${ins.length && outs.length ? "<br>" : ""}${outs.length ? `<span class="need">Out:</span> ${esc(outs.slice(0, 12).join(", "))}${outs.length > 12 ? "…" : ""}` : ""}${!ins.length && !outs.length ? "No card changes" : ""}</span>` : ""}
+      ${k < vs.length - 1 ? `<div><button class="ghost mini" data-restore="${k}">Go back to this version</button></div>` : ""}</div>`;
+  }).join("");
+  box.querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
+    const v = vs[+b.dataset.restore], cards = [], basics = {}; let cmd = null;
+    for (const [n, q] of Object.entries(v.cards)) { if (n.startsWith("⌘")) { cmd = n.slice(1); continue; } const i = lookup(n); if (i >= 0 && isBasic(card(i))) basics[n] = q; else cards.push({ name:n, qty:q, role:(d.cards.find(c => c.name === n) || {}).role || "" }); }
+    d.cards = cards; d.basics = basics; d.commander = cmd; d.identity = cmd ? card(lookup(cmd))[C.id] : d.identity;
+    d.total = cards.reduce((a, c) => a + c.qty, 0) + Object.values(basics).reduce((a, q) => a + q, 0) + (cmd ? 1 : 0);
+    d._note = `Went back to the ${new Date(v.at).toLocaleDateString()} version`;
+    await saveDeck(d); renderDeck();
+  });
+}
+
+/* ================= game night ================= */
+function quickBracket(entries, commander){
+  const idx = [...entries, ...(commander ? [[commander, 1]] : [])].map(([n, q]) => [lookup(n), q]).filter(([i]) => i >= 0);
+  const gc = idx.filter(([i]) => card(i)[C.flags] & 64).length;
+  const mld = idx.some(([i]) => RX_MLD.test(card(i)[C.text]));
+  const extra = idx.filter(([i]) => RX_EXTRA.test(card(i)[C.text]) && !RX_NOEXTRA.test(card(i)[C.text])).length;
+  return gc > 3 || mld ? 4 : gc ? 3 : extra >= 3 ? 3 : 2;
+}
+function deckBracket(d){ return d.bracket?.b || quickBracket(deckEntries(d).filter(([n]) => n !== d.commander), d.commander); }
+S.gn = LS.get("dw.gn") || [{ name:"Player 2", bracket:"" , list:"" }];
+function renderGameNight(){
+  const box = $("#gnPlayers"); if (!box) return;
+  box.innerHTML = S.gn.map((o, k) => `<div class="opp"><div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" data-gnn="${k}" value="${esc(o.name)}" aria-label="Player name" style="flex:1"><select data-gnb="${k}" style="width:auto" aria-label="Their bracket"><option value="">Bracket?</option>${[1,2,3,4,5].map(b => `<option value="${b}" ${String(o.bracket) === String(b) ? "selected" : ""}>Bracket ${b}</option>`).join("")}</select><button class="ghost mini" data-gnx="${k}" aria-label="Remove player">×</button></div>
+    <details ${o.list ? "open" : ""}><summary class="small">Or paste their decklist</summary><textarea data-gnl="${k}" placeholder="Commander&#10;1 …">${esc(o.list || "")}</textarea>${o.list ? `<p class="small muted">Estimated from the list: Bracket ${o.est || "?"}</p>` : ""}</details></div>`).join("");
+  const save = () => LS.set("dw.gn", S.gn);
+  box.querySelectorAll("[data-gnn]").forEach(x => x.oninput = () => { S.gn[+x.dataset.gnn].name = x.value; save(); });
+  box.querySelectorAll("[data-gnb]").forEach(x => x.onchange = () => { S.gn[+x.dataset.gnb].bracket = x.value; save(); });
+  box.querySelectorAll("[data-gnl]").forEach(x => x.onchange = () => {
+    const o = S.gn[+x.dataset.gnl]; o.list = x.value;
+    const p = parseDeckList(x.value), cmd = p.commanders.length ? card(p.commanders[0])[C.name] : null;
+    o.est = p.main.size ? quickBracket([...p.main].map(([i, q]) => [card(i)[C.name], q]), cmd) : null;
+    if (o.est && !o.bracket) o.bracket = String(o.est);
+    save(); renderGameNight();
+  });
+  box.querySelectorAll("[data-gnx]").forEach(x => x.onclick = () => { S.gn.splice(+x.dataset.gnx, 1); save(); renderGameNight(); });
+}
+$("#gnAdd").onclick = () => { if (S.gn.length >= 5) return; S.gn.push({ name:`Player ${S.gn.length + 2}`, bracket:"", list:"" }); LS.set("dw.gn", S.gn); renderGameNight(); };
+$("#gnGo").onclick = () => {
+  const out = $("#gnOut"), br = S.gn.map(o => +o.bracket || o.est).filter(Boolean);
+  const mine = S.decks.filter(d => d.format === "commander");
+  if (!mine.length) { out.innerHTML = `<div class="notice warn">Save a Commander deck first.</div>`; return; }
+  if (!br.length) { out.innerHTML = `<div class="notice warn">Give at least one other player a bracket, or paste their list.</div>`; return; }
+  const target = br.slice().sort((a, b) => a - b)[Math.floor((br.length - 1) / 2)];
+  const ranked = mine.map(d => { const b = deckBracket(d), r = deckRecord(d.id); return { d, b, r, gap:Math.abs(b - target) }; })
+    .sort((a, b) => a.gap - b.gap || (b.d.built ? 1 : 0) - (a.d.built ? 1 : 0) || (b.r.w - b.r.l) - (a.r.w - a.r.l));
+  out.innerHTML = `<p class="small" style="margin-top:8px">The table looks like <b>Bracket ${target}</b>.</p>` + ranked.slice(0, 5).map((x, k) => `<div class="pick5"><div class="row" style="justify-content:space-between"><b>${k === 0 ? "Bring: " : ""}${esc(x.d.name)}</b><span class="count num">B${x.b}${x.d.bracket ? "" : "~"}</span></div>
+    <span class="small">${x.gap === 0 ? "Matches the table." : x.b > target ? `Probably too strong for this table (${x.b - target} bracket${x.b - target > 1 ? "s" : ""} up).` : `May be outgunned (${target - x.b} bracket${target - x.b > 1 ? "s" : ""} down).`}${x.d.built ? "" : " Not built yet."}${x.r.w + x.r.l ? ` Record ${x.r.w}–${x.r.l}.` : ""}</span></div>`).join("")
+    + `<p class="small muted">B~ means a quick estimate. Run Check bracket and combos on a deck for a fuller one.</p>`;
+};
+
+/* ================= sync through a private GitHub Gist ================= */
+const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn"];
+const SYNC_FILE = "deckwright-sync.json", GH = "https://api.github.com";
+const syncCfg = () => { try { return JSON.parse(localStorage.getItem("dw.sync")) || {}; } catch { return {}; } };
+const saveSyncCfg = c => { try { localStorage.setItem("dw.sync", JSON.stringify(c)); } catch {} };
+let syncTimer = null, syncing = false;
+(() => { const raw = LS.set; LS.set = (k, v) => { raw(k, v); if (SYNC_KEYS.includes(k) && !S.applyingSync) markDirty(); }; })();
+function markDirty(){
+  const c = syncCfg(); if (!c.token) return;
+  c.dirty = true; saveSyncCfg(c);
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow(true), 8000);
+}
+const ghHeaders = token => ({ "Authorization":"Bearer " + token, "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" });
+async function gh(token, path, opts = {}){
+  let r;
+  try { r = await fetch(GH + path, { ...opts, headers:{ ...ghHeaders(token), ...(opts.body ? { "content-type":"application/json" } : {}) } }); }
+  catch { throw Object.assign(new Error("Couldn't reach GitHub"), { code:"network" }); }
+  if (r.status === 401) throw Object.assign(new Error("GitHub rejected the token"), { code:"auth" });
+  if (r.status === 403 || r.status === 404) return { status:r.status, json:null };
+  if (!r.ok) throw Object.assign(new Error("GitHub answered " + r.status), { code:"server" });
+  return { status:r.status, json: r.status === 204 ? null : await r.json() };
+}
+function localPayload(){ const data = {}; for (const k of SYNC_KEYS) { const v = localStorage.getItem(k); if (v != null) data[k] = v; } return { app:"deckwright-sync", v:1, stamp:Date.now(), data }; }
+async function pushGist(c){
+  const p = localPayload();
+  const body = JSON.stringify({ description:"Deckwright sync", files:{ [SYNC_FILE]:{ content:JSON.stringify(p) } } });
+  if (c.gistId) { const r = await gh(c.token, "/gists/" + c.gistId, { method:"PATCH", body }); if (r.status === 404) c.gistId = null; }
+  if (!c.gistId) { const r = await gh(c.token, "/gists", { method:"POST", body:JSON.stringify({ description:"Deckwright sync", public:false, files:{ [SYNC_FILE]:{ content:JSON.stringify(p) } } }) }); if (!r.json) throw new Error("GitHub didn't create the sync file. Check the token has the gist permission."); c.gistId = r.json.id; }
+  c.lastRemote = p.stamp; c.dirty = false; c.lastSync = Date.now(); saveSyncCfg(c);
+}
+async function readGist(c){
+  if (!c.gistId) {
+    const r = await gh(c.token, "/gists?per_page=100");
+    const g = (r.json || []).find(x => x.files && x.files[SYNC_FILE]); if (!g) return null;
+    c.gistId = g.id; saveSyncCfg(c);
+  }
+  const r = await gh(c.token, "/gists/" + c.gistId); if (!r.json) { c.gistId = null; saveSyncCfg(c); return null; }
+  const f = r.json.files?.[SYNC_FILE]; if (!f) return null;
+  let text = f.content;
+  if (f.truncated && f.raw_url) { const rr = await fetch(f.raw_url); text = await rr.text(); }
+  try { return JSON.parse(text); } catch { return null; }
+}
+function applyRemote(remote, c){
+  S.applyingSync = true;
+  for (const k of SYNC_KEYS) { if (remote.data?.[k] != null) localStorage.setItem(k, remote.data[k]); else localStorage.removeItem(k); }
+  c.lastRemote = remote.stamp; c.dirty = false; c.lastSync = Date.now(); saveSyncCfg(c);
+  location.reload();
+}
+async function syncNow(auto){
+  const c = syncCfg(); if (!c.token || syncing) return;
+  syncing = true; renderSync("Syncing…");
+  try {
+    const remote = await readGist(c);
+    if (!remote) await pushGist(c);
+    else if (remote.stamp === c.lastRemote) { if (c.dirty) await pushGist(c); else { c.lastSync = Date.now(); saveSyncCfg(c); } }
+    else if (!c.dirty || (!S.coll.size && !S.decks.length)) { applyRemote(remote, c); return; }
+    else { syncConflict(remote, c); return; }
+    renderSync();
+  } catch (e) {
+    console.warn(e);
+    renderSync(e.code === "auth" ? "GitHub rejected the token. Check it in Settings." : auto ? "" : (e.message || "Sync failed."), true);
+  } finally { syncing = false; }
+}
+function syncConflict(remote, c){
+  const when = new Date(remote.stamp).toLocaleString();
+  $("#syncBanner").innerHTML = `<div class="notice warn" style="margin-bottom:8px"><b>This device and your synced data both changed.</b> The synced copy is from ${esc(when)}. Which do you want to keep?
+    <div class="row btnrow" style="margin-top:8px"><button class="primary" id="keepRemote">Use the synced copy</button><button id="keepLocal">Keep this device's</button></div></div>`;
+  $("#keepRemote").onclick = () => applyRemote(remote, c);
+  $("#keepLocal").onclick = async () => { $("#syncBanner").innerHTML = ""; try { await pushGist(c); renderSync(); } catch (e) { renderSync(e.message, true); } };
+  renderSync("Waiting for you to choose which copy to keep.");
+}
+function renderSync(msg, bad){
+  const box = $("#syncState"); if (!box) return;
+  const c = syncCfg();
+  box.innerHTML = c.token ? `<div class="notice ${bad ? "bad" : "ok"}">${esc(msg || (c.lastSync ? `Sync is on. Last synced ${new Date(c.lastSync).toLocaleString()}.` : "Sync is on."))}</div>` : `<div class="notice">Sync is off. Without it, use Backup to move your data.</div>`;
+  $("#syncNowBtn").hidden = $("#syncOff").hidden = !c.token;
+}
+$("#ghShow").onclick = () => { const i = $("#ghToken"); i.type = i.type === "password" ? "text" : "password"; $("#ghShow").textContent = i.type === "password" ? "Show" : "Hide"; };
+$("#syncSetup").onclick = async () => {
+  const t = $("#ghToken").value.trim();
+  if (!/^(ghp_|github_pat_|gho_)/.test(t)) { $("#syncMsg").innerHTML = `<div class="notice bad">That doesn't look like a GitHub token. They start with ghp_ or github_pat_.</div>`; return; }
+  $("#syncSetup").disabled = true;
+  try {
+    const r = await gh(t, "/user"); if (!r.json) throw new Error("GitHub didn't accept that token.");
+    const c = { token:t, dirty:!!(S.coll.size || S.decks.length) }; saveSyncCfg(c);
+    $("#ghToken").value = ""; $("#syncMsg").innerHTML = `<div class="notice ok">Connected to ${esc(r.json.login)}'s GitHub.</div>`;
+    await syncNow(false);
+  } catch (e) { $("#syncMsg").innerHTML = `<div class="notice bad">${esc(e.message || "Couldn't connect to GitHub.")}</div>`; }
+  finally { $("#syncSetup").disabled = false; }
+};
+$("#syncNowBtn").onclick = () => syncNow(false);
+$("#syncOff").onclick = () => { const b = $("#syncOff"); if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to turn off"; setTimeout(() => { if (b.isConnected) { delete b.dataset.c; b.textContent = "Turn off"; } }, 3000); return; }
+  saveSyncCfg({}); delete b.dataset.c; b.textContent = "Turn off"; $("#syncMsg").innerHTML = `<div class="notice ok">Sync turned off on this device. Your data stays here and in the Gist.</div>`; renderSync(); };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.cards.length) syncNow(true); });
 
 /* ---------- shared helpers ---------- */
 function copyText(t, btn, fallbackBox){
@@ -1846,6 +2424,7 @@ async function bracketPanel(box, entries, commander, fmt, deckId){
       if (extra.length >= 3 && b < 3) { b = 3; why.push(`${extra.length} extra-turn cards, enough to start chaining turns.`); }
       if (!b) { b = 2; why.push("No Game Changers, mass land denial or two-card combos."); }
     }
+    if (deckId && combos && isCmd) { const dk = S.decks.find(x => x.id === deckId); if (dk) { dk.bracket = { b, at:Date.now() }; LS.set("dw.decks", S.decks); } }
     const label = { 2:"Core", 3:"Upgraded", 4:"Optimized" }[b];
     const list = (title, arr, note) => arr.length ? `<p class="small"><span class="label">${title}</span> ${esc(arr.join(", "))}${note ? ` <span class="muted">${note}</span>` : ""}</p>` : "";
     const almost = combos ? combos.almostIncluded.slice().sort((a, b2) => (ownIt(comboCards(a).find(n => !inList(n)) || "") ? 0 : 1) - (ownIt(comboCards(b2).find(n => !inList(n)) || "") ? 0 : 1)) : [];
@@ -2289,7 +2868,8 @@ function makeSampler(key){
     const pageTools = opts.tools || [];
     const tools = pageTools.map(t => ({ name:t.name, description:t.description, input_schema:t.inputSchema || { type:"object", properties:{} } }));
     // the big prompt is cached so each validation round only pays a fraction for it
-    const messages = [{ role:"user", content:[{ type:"text", text:prompt, cache_control:{ type:"ephemeral" } }] }];
+    const imgs = (opts.images || []).map(im => ({ type:"image", source:{ type:"base64", media_type:im.media_type, data:im.data } }));
+    const messages = [{ role:"user", content:[...imgs, { type:"text", text:prompt, cache_control:{ type:"ephemeral" } }] }];
     const MAX_ROUNDS = 6;
     for (let round = 0; ; round++) {
       const body = { model, max_tokens:16000, messages };
@@ -2368,7 +2948,7 @@ $("#keyRemove").onclick = () => {
 
 /* ---------- backup ---------- */
 $("#bkSave").onclick = () => {
-  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints, games:S.games, history:S.history, wish:S.wish };
+  const data = { app:"deckwright", version:1, exportedAt:new Date().toISOString(), collection:collAsObject(), decks:S.decks, prints:S.prints, games:S.games, history:S.history, wish:S.wish, loc:S.loc };
   const blob = new Blob([JSON.stringify(data)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = `deckwright-backup-${new Date().toISOString().slice(0,10)}.json`;
@@ -2392,6 +2972,7 @@ $("#bkLoad").addEventListener("change", e => {
       if (Array.isArray(data.games)) { S.games = data.games; LS.set("dw.games", S.games); }
       if (data.history) { S.history = data.history; LS.set("dw.history", S.history); }
       if (Array.isArray(data.wish)) { S.wish = data.wish; LS.set("dw.wish", S.wish); }
+      if (data.loc && typeof data.loc === "object") { S.loc = data.loc; LS.set("dw.loc", S.loc); }
       S.decks = Array.isArray(data.decks) ? data.decks : []; LS.set("dw.decks", S.decks);
       await persistCollection(); renderAll();
       $("#bkMsg").innerHTML = `<div class="notice ok">Restored.</div>`;
@@ -2564,9 +3145,10 @@ function showTab(t){
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === t ? "page" : "false"));
   LS.set("dw.tab", t); window.scrollTo(0, 0);
   if (t === "play") renderPlay();
+  if (t !== "collection") stopScan();
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-function renderAll(){ renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); if (!$("#tab-play").hidden) renderPlay(); }
+function renderAll(){ renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); renderSync(); renderScanList(); if (!$("#tab-play").hidden) renderPlay(); }
 
 (async function boot(){
   showTab(LS.get("dw.tab") || "collection");
