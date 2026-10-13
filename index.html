@@ -219,6 +219,21 @@ body.nokey [data-claude]:not(h2):not(h3){opacity:.62}
 body.nokey [data-claude]::after{content:"Needs key";font-size:.66rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;border:1px solid currentColor;border-radius:999px;padding:1px 6px;display:table;margin:3px auto 0;opacity:1;white-space:nowrap;line-height:1.3}
 body.nokey h2[data-claude]::after,body.nokey h3[data-claude]::after{display:inline-block;margin:0 0 0 .5em;vertical-align:3px}
 body.nokey label[data-claude]{flex-direction:column}
+#proxyPrint{display:none}
+.pxlist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r);padding:2px 10px;margin:8px 0}
+.pxrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.pxrow:last-child{border-bottom:0}
+.pxrow input[type=number]{width:3.6em}
+@media print{
+  @page{size:auto;margin:6mm}
+  body.printing{background:#fff!important}
+  body.printing > :not(#proxyPrint){display:none!important}
+  body.printing #proxyPrint{display:block}
+  .pxsheet{display:grid;grid-template-columns:repeat(3,63mm);grid-auto-rows:88mm;gap:0;justify-content:center;break-after:page;page-break-after:always}
+  .pxsheet:last-child{break-after:auto;page-break-after:auto}
+  .pxcard{width:63mm;height:88mm;outline:.15mm dashed #9a9a9a;outline-offset:-.075mm;overflow:hidden}
+  .pxcard img{width:100%;height:100%;display:block;object-fit:cover}
+}
 .keybar{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .scanwrap{position:relative;border-radius:var(--r);transition:box-shadow .15s}
 .scanwrap.snap{box-shadow:0 0 0 4px var(--ok)}
@@ -1167,6 +1182,12 @@ function renderDeck(){
     <div id="shareOut"></div>
   </div>
   <div class="panel">
+    <h3>Proxies</h3>
+    <p class="small muted">Print stand-ins for cards you don't have free, so you can play the deck before buying. Sleeve each one in front of a basic land.</p>
+    <div class="row"><button class="grow" id="proxyBtn">Print proxies</button></div>
+    <div id="proxyOut"></div>
+  </div>
+  <div class="panel">
     <h3>Mana base</h3>
     <div id="manaOut"></div>
   </div>
@@ -1186,6 +1207,10 @@ function renderDeck(){
   $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
   $("#shareBtn").onclick = () => shareDeck(d);
   $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
+  $("#proxyBtn").onclick = () => {
+    const short = new Map(shortfalls(d).map(x => [x.n, x.q - x.free]));
+    proxyPanel($("#proxyOut"), deckEntries(d).filter(([n]) => { const i = lookup(n); return i >= 0 && !isBasic(card(i)); }).map(([n, q]) => ({ name:n, qty:q, def:short.get(n) || 0 })));
+  };
   $("#forgeBtn").onclick = () => forgePanel($("#shareOut"), { name:d.name, format:d.format, commanders:d.commander ? [d.commander] : [],
     main:[...(d.cards || []).map(c => [c.name, c.qty]), ...Object.entries(d.basics || {})] });
   manaPanel($("#manaOut"), deckEntries(d).filter(([n]) => n !== d.commander).concat(Object.entries(d.basics || {})), d.commander, d.format);
@@ -1302,6 +1327,7 @@ function renderCheck(){
       <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
       <button class="grow" id="forgeCheckBtn">Play it in Forge</button>
+      <button class="grow" id="proxyCheckBtn">Print proxies</button>
       <button class="primary grow" id="evalBtn" data-claude>${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
     <textarea id="needArea" hidden readonly></textarea>
@@ -1326,6 +1352,7 @@ function renderCheck(){
   };
   $("#evalBtn").onclick = evaluateDeck;
   $("#saveCheckBtn").onclick = saveCheckAsDeck;
+  $("#proxyCheckBtn").onclick = () => proxyPanel($("#evalMsg"), k.rows.filter(r => r.status !== "basic").map(r => ({ name:card(r.i)[C.name], qty:r.need, def:r.missing })));
   $("#forgeCheckBtn").onclick = () => forgePanel($("#evalMsg"), { name:k.commanders.length ? card(k.commanders[0])[C.name] : "Checked deck", format:k.fmt,
     commanders:k.commanders.map(i => card(i)[C.name]), main:k.rows.filter(r => !r.isCmd).map(r => [card(r.i)[C.name], r.need]) });
   if ($("#wishCheckBtn")) $("#wishCheckBtn").onclick = () => { const n = addToWish(missing.map(r => [card(r.i)[C.name], r.missing])); $("#evalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist on the Collection tab.</div>`; };
@@ -3095,6 +3122,55 @@ async function decodeDeck(s){
   const json = s[0] === "z" ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text() : new TextDecoder().decode(bytes);
   return JSON.parse(json);
 }
+/* ---------- proxies: printable card images for playtesting ---------- */
+// Images come from Scryfall unaltered (artist and copyright line kept), printed at real card size, 9 to a page.
+const pxImg = (name, back) => `https://api.scryfall.com/cards/named?format=image&version=large${back ? "&face=back" : ""}&exact=${encodeURIComponent(name)}`;
+const isTwoSided = n => { const i = lookup(n); if (i < 0) return false; const c = card(i); return c[C.name].includes(" // ") && !/ \/\/ /.test(c[C.cost]); };
+function proxyPanel(box, entries){
+  let showAll = !entries.some(e => e.def > 0);
+  const pick = new Map(entries.map(e => [e.name, e.def]));
+  const draw = () => {
+    const list = showAll ? entries : entries.filter(e => e.def > 0);
+    const total = [...pick.values()].reduce((a, q) => a + q, 0);
+    const backs = $("#pxBacks")?.checked ?? true;
+    const sides = [...pick].reduce((a, [n, q]) => a + q * (backs && isTwoSided(n) ? 2 : 1), 0);
+    box.innerHTML = `<div class="notice" style="margin-top:8px">
+      <p class="small">${entries.some(e => e.def > 0) ? "Cards you don't have a free copy of are picked. Change the numbers to print more or fewer." : "You have every card in this deck. Pick any you want to proxy, like ones that live in another deck."}</p>
+      <div class="row btnrow"><button class="ghost mini" id="pxAll">${showAll ? "Only cards I'm missing" : `Show all ${entries.length} cards`}</button><button class="ghost mini" id="pxNone">Clear</button></div>
+      <div class="pxlist">${list.length ? list.map(e => `<label class="pxrow"><input type="checkbox" data-pxc="${esc(e.name)}"${pick.get(e.name) > 0 ? " checked" : ""}><span class="small"><b>${esc(e.name)}</b>${e.def > 0 ? ` <span class="need">missing ${e.def}</span>` : ""}</span><input type="number" min="0" max="99" inputmode="numeric" value="${pick.get(e.name) || 0}" data-pxq="${esc(e.name)}" aria-label="Copies of ${esc(e.name)}"></label>`).join("") : `<p class="small muted">Nothing missing.</p>`}</div>
+      <label class="row small"><input type="checkbox" id="pxBacks"${backs ? " checked" : ""}> Include the back of two-sided cards</label>
+      <div class="row btnrow"><button class="primary grow" id="pxPrint"${sides ? "" : " disabled"}>Print ${sides} card${sides === 1 ? "" : "s"} (${Math.ceil(sides / 9) || 0} page${Math.ceil(sides / 9) === 1 ? "" : "s"})</button></div>
+      <p class="small muted">Print at 100% scale ("Actual size", not "Fit to page") so they come out the size of real cards. For casual games and playtesting only: proxies aren't allowed at sanctioned events, and never sell or trade them as real cards.</p>
+      <div id="pxMsg"></div></div>`;
+    $("#pxAll").onclick = () => { showAll = !showAll; draw(); };
+    $("#pxNone").onclick = () => { for (const k of pick.keys()) pick.set(k, 0); draw(); };
+    $("#pxBacks").onchange = draw;
+    box.querySelectorAll("[data-pxc]").forEach(cb => cb.onchange = () => { const e = entries.find(x => x.name === cb.dataset.pxc); pick.set(e.name, cb.checked ? (e.def || e.qty || 1) : 0); draw(); });
+    box.querySelectorAll("[data-pxq]").forEach(inp => inp.onchange = () => { pick.set(inp.dataset.pxq, Math.max(0, Math.min(99, parseInt(inp.value, 10) || 0))); draw(); });
+    $("#pxPrint").onclick = () => printProxies([...pick].filter(([, q]) => q > 0), $("#pxBacks").checked, $("#pxMsg"));
+  };
+  draw();
+}
+async function printProxies(list, backs, msg){
+  const faces = [];
+  for (const [n, q] of list) for (let k = 0; k < q; k++) { faces.push(pxImg(n, false)); if (backs && isTwoSided(n)) faces.push(pxImg(n, true)); }
+  document.getElementById("proxyPrint")?.remove();
+  const root = document.createElement("div"); root.id = "proxyPrint";
+  for (let k = 0; k < faces.length; k += 9)
+    root.insertAdjacentHTML("beforeend", `<div class="pxsheet">${faces.slice(k, k + 9).map(u => `<div class="pxcard"><img src="${u}" alt=""></div>`).join("")}</div>`);
+  document.body.appendChild(root);
+  msg.innerHTML = `<div class="progress"><div class="spin"></div><span>Getting ${faces.length} card image${faces.length === 1 ? "" : "s"} from Scryfall…</span></div>`;
+  const imgs = [...root.querySelectorAll("img")];
+  let failed = 0;
+  await Promise.all(imgs.map(img => img.complete && img.naturalWidth ? null : new Promise(ok => { img.onload = ok; img.onerror = () => { failed++; ok(); }; })));
+  if (failed === imgs.length) { root.remove(); msg.innerHTML = `<div class="notice bad">Couldn't get the card images. Check your connection and try again.</div>`; return; }
+  msg.innerHTML = failed ? `<div class="notice warn">${failed} image${failed === 1 ? "" : "s"} didn't load and will print blank.</div>` : "";
+  const done = () => { document.body.classList.remove("printing"); root.remove(); window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  document.body.classList.add("printing");
+  setTimeout(() => window.print(), 50);
+}
+
 /* ---------- Forge (free Magic program with an AI opponent) ---------- */
 // Forge names split cards and Rooms in full ("Fire // Ice") and every other two-sided card by its front face.
 function forgeName(n){
