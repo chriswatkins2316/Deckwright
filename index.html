@@ -657,6 +657,7 @@ const anyNumber = c => /A deck can have any number of cards named/i.test(c[C.tex
 const legalIn = (c, fmt) => fmt === "casual" ? true : FMT[fmt]?.arena ? !!((c[C.arena] || 0) & FMT[fmt].abit) : !!(c[C.flags] & FMT[fmt].bit);
 const canCommand = c => !!(c[C.flags] & 32);
 const isCmdFmt = f => f === "commander" || !!FMT[f]?.cmd;
+const sizeOk = (total, f) => isCmdFmt(f) ? total === FMT[f].size : total >= (FMT[f]?.size || 60);
 // Brawl also lets a legendary planeswalker lead
 const canCommandIn = (c, fmt) => canCommand(c) || (!!FMT[fmt]?.arena && isCmdFmt(fmt) && /\bLegendary\b/.test(c[C.type]) && /\bPlaneswalker\b/.test(c[C.type]));
 const onArena = c => !!((c[C.arena] || 0) & A_ON);
@@ -1338,7 +1339,7 @@ function renderDeck(){
   const cmdIdx = d.commander ? lookup(d.commander) : -1;
   view.innerHTML = `<div class="panel">
     <div class="decktop"><div class="grow"><span class="label">${d.arena ? "MTG Arena · " : ""}${esc(f.label)}${d.commander ? "" : d.identity ? " · " + d.identity : ""}</span><h2 id="deckName">${esc(d.name)}</h2><button class="ghost" id="renameBtn" style="min-height:30px;padding:3px 10px;font-size:.8rem">Rename</button></div>
-      <span class="count ${total >= f.size ? "ok" : "short"}">${total}/${f.size}</span></div>
+      <span class="count ${sizeOk(total, d.format) ? "ok" : "short"}">${total}/${f.size}</span></div>
     ${cmdIdx >= 0 ? `<div class="list">${cardRow(cmdIdx, 1, "commander")}</div>` : ""}
     ${d.summary ? `<p>${esc(d.summary)}</p>` : ""}
     ${d.arena ? arenaNeedHTML(d) : `<p class="small muted">Value of these cards: <b class="price">${money(d.cards.reduce((a,e) => { const i = lookup(e.name); return a + (i < 0 ? 0 : e.qty * unitOwned(i)); }, 0) + (cmdIdx >= 0 ? unitOwned(cmdIdx) : 0))}</b></p>`}
@@ -1686,7 +1687,7 @@ $("#checkResetBtn").onclick = () => {
 function renderSaved(){
   const box = $("#savedList");
   if (!S.decks.length) { box.innerHTML = `<div class="empty"><h3>No saved decks</h3><p class="small muted">Build one on the Build tab and tap Save deck. They're stored on this device.</p></div>`; return; }
-  box.innerHTML = S.decks.map(d => `<div class="saved"><button class="open" data-id="${d.id}">${esc(d.name)}</button><span class="count num ${d.total >= FMT[d.format].size ? "ok":"short"}">${d.total}/${FMT[d.format].size}</span>
+  box.innerHTML = S.decks.map(d => `<div class="saved"><button class="open" data-id="${d.id}">${esc(d.name)}</button><span class="count num ${sizeOk(d.total, d.format) ? "ok":"short"}">${d.total}/${FMT[d.format].size}</span>
     <span class="small muted">${d.arena ? `<span class="atag">Arena</span> ` : ""}${esc(FMT[d.format].label)}${d.commander ? " · " + esc(d.commander) : ""} · ${new Date(d.createdAt).toLocaleDateString()}</span>
     <span class="row" style="justify-content:flex-end"><button class="ghost danger small" data-del="${d.id}">Delete</button></span>
     ${d.arena ? `<span class="small muted">${recordText(d.id).replace(/^ · /, "") || "MTG Arena deck"}</span><span></span>` : `<label class="row small builtbox"><input type="checkbox" data-built="${d.id}" ${d.built ? "checked" : ""}> Built${recordText(d.id)}</label><span></span>`}
@@ -1808,7 +1809,7 @@ function deckFromCards(name, cmap, opts = {}){
 }
 /* ---------- importing a deck exported from MTG Arena ---------- */
 function parseArenaExport(text){
-  const res = { name:"", cmd:[], main:new Map(), side:0, unknown:[], notArena:[] };
+  const res = { name:"", cmd:[], main:new Map(), side:0, unknown:[], unknownRows:[], notArena:[] };
   let sec = "main", about = false;
   for (const raw of String(text).split(/\r?\n/)) {
     const l = raw.trim(); if (!l) { about = false; continue; }
@@ -1818,12 +1819,12 @@ function parseArenaExport(text){
     if (h === "commander") { sec = "cmd"; continue; }
     if (h === "deck" || h === "main" || h === "maindeck") { sec = "main"; continue; }
     if (h === "sideboard" || h === "companion" || h === "maybeboard") { sec = "side"; continue; }
-    const m = l.match(/^(\d+)x?\s+(.+?)(?:\s+\([A-Za-z0-9_]{2,8}\)(?:\s+\S+)?)?\s*$/);
+    const m = l.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9_]{2,8})\)(?:\s+(\S+))?)?\s*$/);
     if (!m) continue;
     const q = parseInt(m[1], 10), name = m[2].trim(); if (!q) continue;
     if (sec === "side") { res.side += q; continue; }
     const i = lookup(name);
-    if (i < 0) { res.unknown.push(name); continue; }
+    if (i < 0) { res.unknown.push(name); res.unknownRows.push({ name, set:(m[3] || "").toLowerCase(), cn:m[4] || "" }); continue; }
     if (hasArenaData() && !onArena(card(i))) res.notArena.push(card(i)[C.name]);
     if (sec === "cmd") { if (!res.cmd.includes(i)) res.cmd.push(i); continue; }
     res.main.set(i, (res.main.get(i) || 0) + q);
@@ -1837,13 +1838,49 @@ function guessArenaFormat(p){
   for (const f of ["a_standard","explorer","historic","timeless","alchemy"]) if (all.every(i => legalIn(card(i), f))) return f;
   return "historic";
 }
-$("#adSave").onclick = () => {
-  const msg = $("#adMsg"), t = $("#adText").value.trim();
+// cards missing from the app's list (brand-new or Arena-only): fetch them from Scryfall and keep them
+async function learnCards(rows, say){
+  const fresh = []; let k = 0;
+  for (const r of rows) {
+    k++; say?.(`Looking up ${k} of ${rows.length} new cards on Scryfall…`);
+    let d = null;
+    for (const url of [`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(r.name)}`, r.set && r.cn ? `https://api.scryfall.com/cards/${encodeURIComponent(r.set)}/${encodeURIComponent(r.cn)}` : null, `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(r.name)}`].filter(Boolean)) {
+      try { const resp = await fetch(url); if (resp.ok) { d = await resp.json(); break; } if (resp.status !== 404) break; } catch { return fresh; }
+      await sleep(100);
+    }
+    if (!d) continue;
+    if (lookup(d.name) >= 0) { fresh.push(d.name); continue; }
+    const row = toRow(d, true); if (!row) continue;
+    S.cards.push(row); S.byName.set(row[0].toLowerCase(), S.cards.length - 1); S.byNorm.set(norm(row[0]), S.cards.length - 1);
+    fresh.push(row); await sleep(100);
+  }
+  const rowsAdded = fresh.filter(Array.isArray);
+  if (rowsAdded.length) {
+    const meta = window.MTG_DB.meta || {};
+    const ov = LS.get(OV_LS) || { date:meta.date, added:[], flags:{}, banned:meta.banned || {} };
+    ov.added = [...(ov.added || []).filter(r => !rowsAdded.some(x => x[0] === r[0])), ...rowsAdded];
+    try { localStorage.setItem(OV_LS, JSON.stringify(ov)); } catch {}
+    reindex();
+  }
+  return fresh;
+}
+$("#adSave").onclick = async () => {
+  const msg = $("#adMsg"), t = $("#adText").value.trim(), btn = $("#adSave");
   if (!t) { msg.innerHTML = `<div class="notice warn">Paste a deck exported from Arena first.</div>`; return; }
-  const p = parseArenaExport(t);
+  let p = parseArenaExport(t);
+  if (p.unknownRows.length) {
+    btn.disabled = true;
+    try { const got = await learnCards(p.unknownRows, x => { msg.innerHTML = `<div class="progress"><div class="spin"></div><span>${esc(x)}</span></div>`; }); if (got.length) p = parseArenaExport(t); }
+    finally { btn.disabled = false; }
+  }
   if (!p.main.size) { msg.innerHTML = `<div class="notice warn">Couldn't find any cards in that list.</div>`; return; }
   let fmt = $("#adFmt").value; if (fmt === "auto") fmt = guessArenaFormat(p);
   if (p.cmd.length && !isCmdFmt(fmt)) fmt = FMT[fmt].size === 60 && [...p.main.values()].reduce((a, b) => a + b, 0) < 70 ? "standardbrawl" : "brawl";
+  // Standard Brawl is 60 cards and Historic Brawl 100: go by the deck's real size
+  let switched = "";
+  const size = [...p.main.values()].reduce((a, b) => a + b, 0) + p.cmd.length;
+  if (fmt === "standardbrawl" && size > 80) { fmt = "brawl"; switched = `It has ${size} cards, so it's saved as Historic Brawl (Standard Brawl decks are 60).`; }
+  else if (fmt === "brawl" && size <= 70) { fmt = "standardbrawl"; switched = `It has ${size} cards, so it's saved as Standard Brawl (Historic Brawl decks are 100).`; }
   const cmap = new Map(p.main), cmd = p.cmd[0] ?? null;
   if (cmd != null) cmap.set(cmd, (cmap.get(cmd) || 0) + 1);
   const name = $("#adName").value.trim() || p.name || (cmd != null ? card(cmd)[C.name] : "Arena deck");
@@ -1852,8 +1889,8 @@ $("#adSave").onclick = () => {
   d._note = "Imported from Arena"; if (d.versions?.length) d.versions[d.versions.length - 1].note = "Imported from Arena";
   LS.set("dw.decks", S.decks); renderSaved();
   const illegal = [...p.main.keys(), ...p.cmd].filter(i => hasArenaData() && !legalIn(card(i), fmt)).map(i => card(i)[C.name]);
-  msg.innerHTML = `<div class="notice ok">Saved <b>${esc(name)}</b> as a ${esc(FMT[fmt].label)} Arena deck (${d.total} cards).${p.side ? ` Left out ${p.side} sideboard card${p.side === 1 ? "" : "s"}.` : ""}${p.cmd.length > 1 ? " Only the first commander was kept." : ""}</div>
-    ${p.unknown.length ? `<div class="notice warn">Didn't recognise: ${esc(p.unknown.slice(0, 8).join(", "))}${p.unknown.length > 8 ? " …" : ""}</div>` : ""}
+  msg.innerHTML = `<div class="notice ok">Saved <b>${esc(name)}</b> as a ${esc(FMT[fmt].label)} Arena deck (${d.total} cards).${switched ? " " + switched : ""}${p.side ? ` Left out ${p.side} sideboard card${p.side === 1 ? "" : "s"}.` : ""}${p.cmd.length > 1 ? " Only the first commander was kept." : ""}</div>
+    ${p.unknown.length ? `<div class="notice warn">Couldn't find ${p.unknown.length === 1 ? "this card" : "these cards"}, even on Scryfall: ${esc(p.unknown.slice(0, 8).join(", "))}${p.unknown.length > 8 ? " …" : ""}. Check your connection and save again.</div>` : ""}
     ${illegal.length ? `<div class="notice warn">Not legal in ${esc(FMT[fmt].label)}: ${esc(illegal.slice(0, 8).join(", "))}${illegal.length > 8 ? " …" : ""}. Pick another format and save again if that's wrong.</div>` : ""}
     <div class="row btnrow"><button class="grow" id="adOpen">Open it</button></div>`;
   $("#adOpen").onclick = () => { S.current = d; showTab("build"); renderDeck(); $("#deckView").scrollIntoView({ behavior:"smooth" }); };
@@ -3964,9 +4001,10 @@ const SKIP_LAYOUTS = new Set(["token","double_faced_token","emblem","art_series"
 const SKIP_SET_TYPES = new Set(["memorabilia","token","minigame"]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const stripReminder = t => String(t || "").replace(/\n/g, " ").replace(/\s*\([^)]*\)/g, "").trim();
-function toRow(d){
+function toRow(d, arenaOk){
   const paper = (d.games || []).includes("paper") || ["legal","restricted","banned"].includes(d.legalities?.vintage);
-  if (SKIP_LAYOUTS.has(d.layout) || SKIP_SET_TYPES.has(d.set_type) || !paper) return null;
+  const onA = (d.games || []).includes("arena") || ["alchemy","historic","timeless","brawl","standardbrawl"].some(f => ["legal","restricted","banned"].includes(d.legalities?.[f]));
+  if (SKIP_LAYOUTS.has(d.layout) || SKIP_SET_TYPES.has(d.set_type) || (!paper && !(arenaOk && onA))) return null;
   const faces = d.card_faces || [d], front = faces[0];
   const type = front.type_line || d.type_line || "";
   const colors = d.colors ?? front.colors ?? [], ident = d.color_identity || [];
@@ -3974,14 +4012,15 @@ function toRow(d){
   const p = front.power ?? d.power, t = front.toughness ?? d.toughness;
   const pt = p != null && t != null ? `${p}/${t}` : (front.loyalty || d.loyalty || front.defense || d.defense || "");
   let flags = 0;
-  for (const [f, b] of Object.entries(BITS)) if (["legal","restricted"].includes(d.legalities?.[f])) flags += b;
+  if (paper) for (const [f, b] of Object.entries(BITS)) if (["legal","restricted"].includes(d.legalities?.[f])) flags += b;
   if ((/Legendary/.test(type) && /Creature/.test(type)) || /can be your commander/.test(d.oracle_text || front.oracle_text || "")) flags += 32;
   if (d.game_changer) flags += 64;
   const L = d.legalities || {}, on = (d.games || []).includes("arena") || ["alchemy","historic","timeless","brawl","standardbrawl"].some(f => ["legal","restricted","banned"].includes(L[f]));
   let af = 0; if (on) { af = A_ON; Object.entries({ standard:1, alchemy:2, historic:4, timeless:8, explorer:16, standardbrawl:32, brawl:64 }).forEach(([f, b]) => { if (["legal","restricted"].includes(L[f])) af += b; }); }
   const rr = { common:"c", uncommon:"u", rare:"r", mythic:"m", special:"r", bonus:"m" }[d.rarity] || "c";
+  if (!paper) af |= A_DIGITAL;
   return [d.name, d.mana_cost || front.mana_cost || "", d.cmc || 0, type, COLORS.filter(c => colors.includes(c)).join(""), COLORS.filter(c => ident.includes(c)).join(""), oracle, pt, flags,
-    +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0), +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0), af, rr];
+    paper ? +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0) : 0, paper ? +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0) : 0, af, rr];
 }
 function applyOverlay(){
   const ov = LS.get(OV_LS); if (!ov) return;
