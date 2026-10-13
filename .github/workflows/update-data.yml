@@ -33,11 +33,30 @@ jobs:
             head -c 400 bulk.json 2>/dev/null; echo; sleep 15
           done
           if [ "$CODE" != "200" ]; then echo "::error::Scryfall refused the bulk-data request (HTTP $CODE). See the lines above."; exit 1; fi
-          URL=$(python3 -c "import json; print(json.load(open('bulk.json'))['download_uri'])")
-          echo "Downloading $URL"
-          curl -fsSL --retry 3 --retry-delay 10 -A "$UA" -o "oracle-cards-$(date -u +%Y%m%d).json" "$URL"
-          ls -la oracle-cards-*.json
-          python3 build_cards.py oracle-cards-*.json cards.js
+          # Scryfall has changed this reply before, so look for the download link instead of trusting one field name
+          python3 - <<'PY'
+          import json
+          d = json.load(open("bulk.json"))
+          found = []
+          def walk(o):
+              if isinstance(o, dict):
+                  for v in o.values(): walk(v)
+              elif isinstance(o, list):
+                  for v in o: walk(v)
+              elif isinstance(o, str) and o.startswith("http") and "oracle" in o.lower() and any(o.split("?")[0].endswith(x) for x in (".json", ".jsonl", ".json.gz", ".jsonl.gz")):
+                  found.append(o)
+          walk(d)
+          print("Reply fields:", list(d.keys()) if isinstance(d, dict) else type(d).__name__)
+          if not found:
+              print(json.dumps(d)[:800]); raise SystemExit("No Oracle Cards download link in Scryfall's reply")
+          open("url.txt", "w").write(found[0])
+          print("Download link:", found[0])
+          PY
+          URL=$(cat url.txt)
+          EXT=$(python3 -c "import sys; u=sys.argv[1].split('?')[0]; print(next(x for x in ('.jsonl.gz','.json.gz','.jsonl','.json') if u.endswith(x)))" "$URL")
+          curl -fsSL --retry 3 --retry-delay 10 -A "$UA" -o "oracle-cards-$(date -u +%Y%m%d)$EXT" "$URL"
+          ls -la oracle-cards-*
+          python3 build_cards.py oracle-cards-* cards.js
 
       - name: Preconstructed decks from MTGJSON
         continue-on-error: true
@@ -47,7 +66,7 @@ jobs:
 
       - name: Save the new data
         run: |
-          rm -f variants.json.gz oracle-cards-*.json AllDeckFiles.tar.gz bulk.json
+          rm -f variants.json.gz oracle-cards-* AllDeckFiles.tar.gz bulk.json url.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for f in combos.json cards.js precons.json; do if [ -f "$f" ]; then git add "$f"; fi; done
