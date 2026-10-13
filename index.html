@@ -481,6 +481,19 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="field autocomplete"><label class="label" for="preconSearch">Or search by name</label><input type="text" id="preconSearch" autocomplete="off" placeholder="Deck name or set, like Eldrazi Unbound"><div class="sugg" id="preconSugg" hidden></div></div>
       <div id="preconOut"></div>
     </div>
+    <div class="panel" id="arenaDeckPanel">
+      <details id="adDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Import an Arena deck</b></summary>
+        <p class="small muted" style="margin-top:8px">In MTG Arena, open the deck and tap <b>Export</b> (it copies the list), then paste it here. It's saved as an Arena deck, so it never touches your paper collection.</p>
+        <textarea id="adText" placeholder="Deck&#10;4 Lightning Strike (DMU) 137&#10;4 Play with Fire (MID) 154&#10;…" style="min-height:120px"></textarea>
+        <div class="two">
+          <div class="field"><label class="label" for="adFmt">Format</label>
+            <select id="adFmt"><option value="auto">Work it out</option><option value="a_standard">Standard</option><option value="alchemy">Alchemy</option><option value="historic">Historic</option><option value="timeless">Timeless</option><option value="explorer">Explorer</option><option value="standardbrawl">Standard Brawl</option><option value="brawl">Historic Brawl</option></select></div>
+          <div class="field"><label class="label" for="adName">Name</label><input type="text" id="adName" placeholder="Optional"></div>
+        </div>
+        <div class="row btnrow"><button class="primary grow" id="adSave">Save Arena deck</button></div>
+        <div id="adMsg"></div>
+      </details>
+    </div>
     <div class="panel"><h2>Saved decks</h2><div id="savedList"></div></div>
   </section>
 
@@ -1699,6 +1712,7 @@ function arenaNeeds(d){
 }
 const wildText = need => ["m","r","u","c"].filter(k => need[k]).map(k => `${need[k]} ${RARNAME[k]}`).join(", ");
 function arenaNeedHTML(d, compact){
+  if (!S.arena.size) return compact ? "" : `<p class="small muted">Import your Arena collection (Collection tab) to see which wildcards this deck needs.</p>`;
   const n = arenaNeeds(d);
   if (!n.total) return `<div class="notice ok">You own every card on Arena.</div>`;
   const over = ["c","u","r","m"].filter(k => n.need[k] > (S.arenaWild[k] || 0));
@@ -1792,6 +1806,60 @@ function deckFromCards(name, cmap, opts = {}){
   LS.set("dw.decks", S.decks);
   return d;
 }
+/* ---------- importing a deck exported from MTG Arena ---------- */
+function parseArenaExport(text){
+  const res = { name:"", cmd:[], main:new Map(), side:0, unknown:[], notArena:[] };
+  let sec = "main", about = false;
+  for (const raw of String(text).split(/\r?\n/)) {
+    const l = raw.trim(); if (!l) { about = false; continue; }
+    const h = l.toLowerCase().replace(/[:\s]+$/, "");
+    if (h === "about") { about = true; continue; }
+    if (about && /^name\s+/i.test(l)) { res.name = l.replace(/^name\s+/i, "").trim(); continue; }
+    if (h === "commander") { sec = "cmd"; continue; }
+    if (h === "deck" || h === "main" || h === "maindeck") { sec = "main"; continue; }
+    if (h === "sideboard" || h === "companion" || h === "maybeboard") { sec = "side"; continue; }
+    const m = l.match(/^(\d+)x?\s+(.+?)(?:\s+\([A-Za-z0-9_]{2,8}\)(?:\s+\S+)?)?\s*$/);
+    if (!m) continue;
+    const q = parseInt(m[1], 10), name = m[2].trim(); if (!q) continue;
+    if (sec === "side") { res.side += q; continue; }
+    const i = lookup(name);
+    if (i < 0) { res.unknown.push(name); continue; }
+    if (hasArenaData() && !onArena(card(i))) res.notArena.push(card(i)[C.name]);
+    if (sec === "cmd") { if (!res.cmd.includes(i)) res.cmd.push(i); continue; }
+    res.main.set(i, (res.main.get(i) || 0) + q);
+  }
+  return res;
+}
+function guessArenaFormat(p){
+  const all = [...p.main.keys(), ...p.cmd], total = [...p.main.values()].reduce((a, b) => a + b, 0) + p.cmd.length;
+  if (p.cmd.length) return total >= 90 ? "brawl" : "standardbrawl";
+  if (!hasArenaData()) return "historic";
+  for (const f of ["a_standard","explorer","historic","timeless","alchemy"]) if (all.every(i => legalIn(card(i), f))) return f;
+  return "historic";
+}
+$("#adSave").onclick = () => {
+  const msg = $("#adMsg"), t = $("#adText").value.trim();
+  if (!t) { msg.innerHTML = `<div class="notice warn">Paste a deck exported from Arena first.</div>`; return; }
+  const p = parseArenaExport(t);
+  if (!p.main.size) { msg.innerHTML = `<div class="notice warn">Couldn't find any cards in that list.</div>`; return; }
+  let fmt = $("#adFmt").value; if (fmt === "auto") fmt = guessArenaFormat(p);
+  if (p.cmd.length && !isCmdFmt(fmt)) fmt = FMT[fmt].size === 60 && [...p.main.values()].reduce((a, b) => a + b, 0) < 70 ? "standardbrawl" : "brawl";
+  const cmap = new Map(p.main), cmd = p.cmd[0] ?? null;
+  if (cmd != null) cmap.set(cmd, (cmap.get(cmd) || 0) + 1);
+  const name = $("#adName").value.trim() || p.name || (cmd != null ? card(cmd)[C.name] : "Arena deck");
+  const d = deckFromCards(name, cmap, { fmt, cmd, source:"arena" });
+  d.arena = true; d.opts = { ...d.opts, arena:true, craft:false, wild:{ ...S.arenaWild }, freeOnly:false, basicsUnlimited:true };
+  d._note = "Imported from Arena"; if (d.versions?.length) d.versions[d.versions.length - 1].note = "Imported from Arena";
+  LS.set("dw.decks", S.decks); renderSaved();
+  const illegal = [...p.main.keys(), ...p.cmd].filter(i => hasArenaData() && !legalIn(card(i), fmt)).map(i => card(i)[C.name]);
+  msg.innerHTML = `<div class="notice ok">Saved <b>${esc(name)}</b> as a ${esc(FMT[fmt].label)} Arena deck (${d.total} cards).${p.side ? ` Left out ${p.side} sideboard card${p.side === 1 ? "" : "s"}.` : ""}${p.cmd.length > 1 ? " Only the first commander was kept." : ""}</div>
+    ${p.unknown.length ? `<div class="notice warn">Didn't recognise: ${esc(p.unknown.slice(0, 8).join(", "))}${p.unknown.length > 8 ? " …" : ""}</div>` : ""}
+    ${illegal.length ? `<div class="notice warn">Not legal in ${esc(FMT[fmt].label)}: ${esc(illegal.slice(0, 8).join(", "))}${illegal.length > 8 ? " …" : ""}. Pick another format and save again if that's wrong.</div>` : ""}
+    <div class="row btnrow"><button class="grow" id="adOpen">Open it</button></div>`;
+  $("#adOpen").onclick = () => { S.current = d; showTab("build"); renderDeck(); $("#deckView").scrollIntoView({ behavior:"smooth" }); };
+  $("#adText").value = ""; $("#adName").value = "";
+};
+
 function binderPick(res){
   S.pendingBinders = [...(res.binders || new Map())];
   if (!S.pendingBinders.length) return "";
