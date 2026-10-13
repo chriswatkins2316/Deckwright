@@ -2,8 +2,8 @@ name: Update card and combo data
 
 on:
   schedule:
-    - cron: "17 9 * * 1"
-  workflow_dispatch:
+    - cron: "17 9 * * 1"   # every Monday morning
+  workflow_dispatch:        # adds a "Run workflow" button
 
 permissions:
   contents: write
@@ -24,8 +24,19 @@ jobs:
       - name: Cards and prices from Scryfall
         continue-on-error: true
         run: |
-          URL=$(curl -fsSL -A "Deckwright/1.0" -H "Accept: application/json" https://api.scryfall.com/bulk-data/oracle-cards | python3 -c "import json,sys; print(json.load(sys.stdin)['download_uri'])")
-          curl -fsSL -A "Deckwright/1.0" -o "oracle-cards-$(date -u +%Y%m%d).json" "$URL"
+          UA="Deckwright/1.0 (+https://github.com/${{ github.repository }})"
+          CODE=""
+          for i in 1 2 3; do
+            CODE=$(curl -sS -A "$UA" -H "Accept: application/json;q=0.9,*/*;q=0.8" -o bulk.json -w "%{http_code}" https://api.scryfall.com/bulk-data/oracle-cards || echo "no-connection")
+            echo "Scryfall bulk-data answered: $CODE"
+            [ "$CODE" = "200" ] && break
+            head -c 400 bulk.json 2>/dev/null; echo; sleep 15
+          done
+          if [ "$CODE" != "200" ]; then echo "::error::Scryfall refused the bulk-data request (HTTP $CODE). See the lines above."; exit 1; fi
+          URL=$(python3 -c "import json; print(json.load(open('bulk.json'))['download_uri'])")
+          echo "Downloading $URL"
+          curl -fsSL --retry 3 --retry-delay 10 -A "$UA" -o "oracle-cards-$(date -u +%Y%m%d).json" "$URL"
+          ls -la oracle-cards-*.json
           python3 build_cards.py oracle-cards-*.json cards.js
 
       - name: Preconstructed decks from MTGJSON
@@ -36,7 +47,7 @@ jobs:
 
       - name: Save the new data
         run: |
-          rm -f variants.json.gz oracle-cards-*.json AllDeckFiles.tar.gz
+          rm -f variants.json.gz oracle-cards-*.json AllDeckFiles.tar.gz bulk.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for f in combos.json cards.js precons.json; do if [ -f "$f" ]; then git add "$f"; fi; done
