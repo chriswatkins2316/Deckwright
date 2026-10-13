@@ -234,6 +234,13 @@ body.nokey label[data-claude]{flex-direction:column}
   .pxcard{width:63mm;height:88mm;outline:.15mm dashed #9a9a9a;outline-offset:-.075mm;overflow:hidden}
   .pxcard img{width:100%;height:100%;display:block;object-fit:cover}
 }
+.wildrow{gap:8px;flex-wrap:wrap}
+.wild{display:flex;flex-direction:column;gap:2px;flex:1 1 70px}
+.wild input{width:100%}
+.seg{display:flex;border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px;background:var(--bg);margin:4px 0 12px}
+.seg button{flex:1;border:0;border-radius:999px;min-height:36px;background:transparent;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.atag{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:0 6px;vertical-align:2px;margin-left:4px}
 .keybar{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .scanwrap{position:relative;border-radius:var(--r);transition:box-shadow .15s}
 .scanwrap.snap{box-shadow:0 0 0 4px var(--ok)}
@@ -354,6 +361,20 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="row"><button class="grow" id="setsBtn">Show my sets</button></div>
       <div id="setsOut"></div>
     </div>
+    <div class="panel" id="arenaPanel">
+      <details id="arenaDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Arena collection</b> <span class="small muted" id="arenaSum"></span></summary>
+        <p class="small muted" style="margin-top:8px">Your MTG Arena cards, kept completely apart from your paper collection. They're only used when you build an Arena deck.</p>
+        <div id="arenaState"></div>
+        <div class="field"><span class="label">Import your Arena cards</span>
+          <p class="small muted">Export your collection from Untapped.gg, MTGA Assistant, Arena Tutor or similar, as a CSV or a list of "count name" lines. Importing replaces your current Arena list.</p>
+          <div class="row btnrow"><label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Choose a file<input type="file" id="arenaFile" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+          <textarea id="arenaPaste" placeholder="4 Lightning Strike&#10;2 Sheoldred, the Apocalypse&#10;…" style="min-height:90px;margin-top:6px"></textarea>
+          <div class="row btnrow"><button class="grow" id="arenaPasteBtn">Use the pasted list</button></div></div>
+        <div class="field"><span class="label">Wildcards you have</span>
+          <div class="row wildrow"><label class="wild"><span class="small">Common</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_c" value="0" aria-label="Common wildcards"></label><label class="wild"><span class="small">Uncommon</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_u" value="0" aria-label="Uncommon wildcards"></label><label class="wild"><span class="small">Rare</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_r" value="0" aria-label="Rare wildcards"></label><label class="wild"><span class="small">Mythic</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_m" value="0" aria-label="Mythic wildcards"></label></div></div>
+        <div id="arenaMsg"></div>
+      </details>
+    </div>
     <div class="panel" id="statsPanel" hidden>
       <details id="statsDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
     </div>
@@ -363,7 +384,16 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <section id="tab-build" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
     <div class="panel" id="buildForm">
       <h2>Build a deck</h2>
-      <p class="small muted">Claude builds only from cards you own, then every card is checked against your collection and the format's legality.</p>
+      <div class="seg" role="group" aria-label="Paper or Arena deck"><button id="modePaper" aria-pressed="true">Paper</button><button id="modeArena" aria-pressed="false">MTG Arena</button></div>
+      <p class="small muted" id="buildIntro">Claude builds only from cards you own, then every card is checked against your collection and the format's legality.</p>
+      <div id="arenaOpts" hidden>
+        <div class="field"><span class="label">Cards to use</span>
+          <label class="row small"><input type="radio" name="arenaSrc" id="arenaOwned" value="owned" checked> Only cards I own on Arena</label>
+          <label class="row small"><input type="radio" name="arenaSrc" id="arenaCraft" value="craft"> Let it craft cards I'm missing with wildcards</label></div>
+        <div class="field" id="craftLimits" hidden><span class="label">Spend at most these wildcards</span>
+          <div class="row wildrow"><label class="wild"><span class="small">Common</span><input type="number" min="0" max="999" inputmode="numeric" id="cap_c" value="0" aria-label="Common wildcards to spend"></label><label class="wild"><span class="small">Uncommon</span><input type="number" min="0" max="999" inputmode="numeric" id="cap_u" value="0" aria-label="Uncommon wildcards to spend"></label><label class="wild"><span class="small">Rare</span><input type="number" min="0" max="999" inputmode="numeric" id="cap_r" value="0" aria-label="Rare wildcards to spend"></label><label class="wild"><span class="small">Mythic</span><input type="number" min="0" max="999" inputmode="numeric" id="cap_m" value="0" aria-label="Mythic wildcards to spend"></label></div>
+          <p class="small muted" id="craftNote"></p></div>
+      </div>
       <div class="two">
         <div class="field"><label class="label" for="fmt">Format</label>
           <select id="fmt">
@@ -401,10 +431,10 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
             <option value="default" selected>Balanced</option>
             <option value="complex">Deep (slower)</option>
           </select></div>
-        <div class="field"><span class="label">Basic lands</span>
+        <div class="field" id="basicsField"><span class="label">Basic lands</span>
           <label class="row small" style="min-height:42px"><input type="checkbox" id="basics" checked> I have plenty of basics</label></div>
       </div>
-      <label class="row small"><input type="checkbox" id="freeOnly" checked> Leave cards in my built decks alone</label>
+      <label class="row small" id="freeOnlyRow"><input type="checkbox" id="freeOnly" checked> Leave cards in my built decks alone</label>
       <div class="row"><button class="primary grow" id="buildBtn" data-claude>Build deck</button><button class="grow" id="bestCmdBtn" data-claude>Find my best commanders</button></div>
       <div id="buildMsg"></div>
       <div id="bestCmdOut"></div>
@@ -562,18 +592,26 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const norm = s => String(s||"").normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 const LS = { get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } }, set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} } };
 const FMT = { standard:{bit:1,label:"Standard",size:60,max:4}, pioneer:{bit:2,label:"Pioneer",size:60,max:4}, modern:{bit:4,label:"Modern",size:60,max:4},
-  legacy:{bit:8,label:"Legacy",size:60,max:4}, commander:{bit:16,label:"Commander",size:100,max:1}, casual:{bit:0,label:"Kitchen table",size:60,max:4} };
+  legacy:{bit:8,label:"Legacy",size:60,max:4}, commander:{bit:16,label:"Commander",size:100,max:1}, casual:{bit:0,label:"Kitchen table",size:60,max:4},
+  // MTG Arena formats: legality comes from the card's Arena bits, never from the paper ones
+  a_standard:{abit:1,label:"Standard (Arena)",size:60,max:4,arena:true}, alchemy:{abit:2,label:"Alchemy",size:60,max:4,arena:true},
+  historic:{abit:4,label:"Historic",size:60,max:4,arena:true}, timeless:{abit:8,label:"Timeless",size:60,max:4,arena:true},
+  explorer:{abit:16,label:"Explorer",size:60,max:4,arena:true}, standardbrawl:{abit:32,label:"Standard Brawl",size:60,max:1,arena:true,cmd:true},
+  brawl:{abit:64,label:"Historic Brawl",size:100,max:1,arena:true,cmd:true} };
+const ARENA_FMTS = ["a_standard","alchemy","historic","timeless","explorer","standardbrawl","brawl"];
+const A_DIGITAL = 128, A_ON = 256;
+const RARNAME = { c:"common", u:"uncommon", r:"rare", m:"mythic" };
 const COLORS = ["W","U","B","R","G"];
 const CNAME = {W:"White",U:"Blue",B:"Black",R:"Red",G:"Green"};
 const BASIC = {W:"Plains",U:"Island",B:"Swamp",R:"Mountain",G:"Forest"};
 const THEMES = ["Go wide with tokens","Graveyard recursion","+1/+1 counters","Spells matter","Fast aggro","Control and card draw","Tribal: my biggest creature type","Big mana, big spells"];
 
-const S = { cards:[], byNorm:new Map(), coll:new Map(), updatedAt:0, db:null, uid:null, sample:null, toolsOK:false,
+const S = { cards:[], byNorm:new Map(), coll:new Map(), arena:new Map(), arenaWild:{ c:0, u:0, r:0, m:0 }, updatedAt:0, db:null, uid:null, sample:null, toolsOK:false,
   decks:[], current:null, filter:{q:"",type:"All"}, shown:120, colorPick:new Set(), ctl:null, pending:null };
 
 /* ---------- card database ---------- */
 // card row: [name, cost, cmc, type, colors, identity, oracle, pt, flags]
-const C = { name:0, cost:1, cmc:2, type:3, col:4, id:5, text:6, pt:7, flags:8 };
+const C = { name:0, cost:1, cmc:2, type:3, col:4, id:5, text:6, pt:7, flags:8, arena:11, rar:12 };
 function loadDB(){
   const s = document.createElement("script");
   s.src = "cards.js";
@@ -603,8 +641,15 @@ const card = i => S.cards[i];
 const isBasic = c => /^Basic\b|Basic Land/.test(c[C.type]) || /^Basic /.test(c[C.type]);
 const isLand = c => /\bLand\b/.test(c[C.type]);
 const anyNumber = c => /A deck can have any number of cards named/i.test(c[C.text]);
-const legalIn = (c, fmt) => fmt === "casual" ? true : !!(c[C.flags] & FMT[fmt].bit);
+const legalIn = (c, fmt) => fmt === "casual" ? true : FMT[fmt]?.arena ? !!((c[C.arena] || 0) & FMT[fmt].abit) : !!(c[C.flags] & FMT[fmt].bit);
 const canCommand = c => !!(c[C.flags] & 32);
+const isCmdFmt = f => f === "commander" || !!FMT[f]?.cmd;
+// Brawl also lets a legendary planeswalker lead
+const canCommandIn = (c, fmt) => canCommand(c) || (!!FMT[fmt]?.arena && isCmdFmt(fmt) && /\bLegendary\b/.test(c[C.type]) && /\bPlaneswalker\b/.test(c[C.type]));
+const onArena = c => !!((c[C.arena] || 0) & A_ON);
+const arenaOnly = c => !!((c[C.arena] || 0) & A_DIGITAL);
+const hasArenaData = () => !!window.MTG_DB?.meta?.arena;
+const rarOf = c => c[C.rar] || "c";
 function pips(cost){
   return (cost||"").replace(/\{([^}]+)\}/g, (_, s) => {
     const cls = COLORS.includes(s) ? s : "";
@@ -730,6 +775,11 @@ function restoreLocal(){
   S.prints = LS.get("dw.prints") || []; indexPrints();
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
   S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || []; S.upc = LS.get("dw.upc") || {}; S.loc = LS.get("dw.loc") || {}; S.scan = LS.get("dw.scan") || [];
+  const a = LS.get("dw.arena") || {}; S.arena = collFromObject(a.items); S.arenaWild = { c:0, u:0, r:0, m:0, ...(a.wild || {}) }; S.arenaAt = a.updatedAt || 0;
+}
+function saveArena(){
+  const items = {}; for (const [i, q] of S.arena) items[card(i)[C.name]] = q;
+  LS.set("dw.arena", { items, wild:S.arenaWild, updatedAt:S.arenaAt });
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -859,12 +909,62 @@ function bindCardRows(root){
 }
 let searchT; $("#collSearch").addEventListener("input", e => { clearTimeout(searchT); searchT = setTimeout(() => { S.filter.q = e.target.value; S.shown = 120; renderCollection(); }, 150); });
 
+/* ---------- Arena collection (separate from paper) ---------- */
+function renderArena(){
+  const n = [...S.arena.values()].reduce((a, b) => a + b, 0), w = S.arenaWild;
+  $("#arenaSum").textContent = S.arena.size ? `${S.arena.size.toLocaleString()} different cards` : "not imported";
+  $("#arenaState").innerHTML = !hasArenaData()
+    ? `<div class="notice warn">The app's card list doesn't have Arena information yet. Run the weekly GitHub job once (Settings, Card data) so it knows which cards are on Arena.</div>`
+    : S.arena.size ? `<div class="notice ok">${n.toLocaleString()} Arena cards (${S.arena.size.toLocaleString()} different)${S.arenaAt ? `, imported ${new Date(S.arenaAt).toLocaleDateString()}` : ""}. <button class="ghost mini danger" id="arenaClear">Clear</button></div>` : "";
+  for (const k of ["c","u","r","m"]) { const el = $("#wild_" + k); if (el && document.activeElement !== el) el.value = w[k] || 0; }
+  if ($("#arenaClear")) $("#arenaClear").onclick = e => { const b = e.target; if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to clear"; return; } S.arena = new Map(); S.arenaAt = Date.now(); saveArena(); renderArena(); };
+}
+function importArena(text){
+  if (!S.cards.length) return;
+  const res = readImport(text), m = new Map();
+  for (const [i, q] of res.out) { const c = card(i); if (!onArena(c) && hasArenaData()) continue; m.set(i, Math.min(isBasic(c) ? 99 : 4, (m.get(i) || 0) + q)); }
+  const skipped = [...res.out.keys()].filter(i => !m.has(i)).length, unk = res.unmatched.size;
+  if (!m.size) { $("#arenaMsg").innerHTML = `<div class="notice warn">No Arena cards found in that list.</div>`; return; }
+  S.arena = m; S.arenaAt = Date.now(); saveArena(); renderArena();
+  $("#arenaMsg").innerHTML = `<div class="notice ok">Saved ${m.size.toLocaleString()} different Arena cards.${unk ? ` ${unk} name${unk === 1 ? "" : "s"} didn't match a card.` : ""}${skipped ? ` ${skipped} card${skipped === 1 ? " isn't" : "s aren't"} on Arena and ${skipped === 1 ? "was" : "were"} left out.` : ""} Your paper collection wasn't touched.</div>`;
+  $("#arenaPaste").value = "";
+}
+$("#arenaFile").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; const r = new FileReader(); r.onload = () => importArena(String(r.result)); r.readAsText(f); });
+$("#arenaPasteBtn").onclick = () => { const t = $("#arenaPaste").value.trim(); if (t) importArena(t); };
+for (const k of ["c","u","r","m"]) $("#wild_" + k).addEventListener("change", e => { S.arenaWild[k] = Math.max(0, parseInt(e.target.value, 10) || 0); saveArena(); renderBuildForm(); });
+
 /* ---------- build form ---------- */
+S.buildMode = LS.get("dw.buildmode") === "arena" ? "arena" : "paper";
+const PAPER_FMT_HTML = $("#fmt").innerHTML;
+const ARENA_FMT_HTML = `<option value="a_standard">Standard (60)</option><option value="alchemy">Alchemy (60)</option><option value="historic">Historic (60)</option><option value="timeless">Timeless (60)</option><option value="explorer">Explorer (60)</option><option value="standardbrawl">Standard Brawl (60, singleton)</option><option value="brawl">Historic Brawl (100, singleton)</option>`;
+function setBuildMode(m){
+  if (m === S.buildMode && $("#fmt").dataset.mode === m) return;
+  S.buildMode = m; LS.set("dw.buildmode", m);
+  const keep = LS.get("dw.fmt." + m);
+  $("#fmt").innerHTML = m === "arena" ? ARENA_FMT_HTML : PAPER_FMT_HTML; $("#fmt").dataset.mode = m;
+  if (keep && [...$("#fmt").options].some(o => o.value === keep)) $("#fmt").value = keep;
+  $("#cmdInput").value = "";
+  renderBuildForm();
+}
+$("#modePaper").onclick = () => setBuildMode("paper");
+$("#modeArena").onclick = () => setBuildMode("arena");
+document.querySelectorAll("[name=arenaSrc]").forEach(r => r.onchange = renderBuildForm);
+for (const k of ["c","u","r","m"]) $("#cap_" + k).addEventListener("change", renderBuildForm);
 function renderBuildForm(){
-  const fmt = $("#fmt").value;
-  $("#cmdField").hidden = fmt !== "commander";
-  $("#bestCmdBtn").hidden = fmt !== "commander";
-  $("#colorField").hidden = fmt === "commander";
+  if ($("#fmt").dataset.mode !== S.buildMode) { $("#fmt").innerHTML = S.buildMode === "arena" ? ARENA_FMT_HTML : PAPER_FMT_HTML; $("#fmt").dataset.mode = S.buildMode; const keep = LS.get("dw.fmt." + S.buildMode); if (keep && [...$("#fmt").options].some(o => o.value === keep)) $("#fmt").value = keep; }
+  const fmt = $("#fmt").value, arena = S.buildMode === "arena", craft = arena && $("#arenaCraft").checked;
+  LS.set("dw.fmt." + S.buildMode, fmt);
+  $("#modePaper").setAttribute("aria-pressed", String(!arena)); $("#modeArena").setAttribute("aria-pressed", String(arena));
+  $("#arenaOpts").hidden = !arena; $("#craftLimits").hidden = !craft;
+  $("#basicsField").hidden = arena; $("#freeOnlyRow").hidden = arena;
+  $("#buildIntro").textContent = arena ? "Builds an MTG Arena deck from your Arena collection. Your paper collection and paper decks aren't touched." : "Claude builds only from cards you own, then every card is checked against your collection and the format's legality.";
+  $("#cmdInput").placeholder = arena ? (craft ? "Leave blank and Claude picks one" : "Leave blank and Claude picks one you own on Arena") : "Leave blank and Claude picks one you own";
+  for (const k of ["c","u","r","m"]) { const el = $("#cap_" + k); if (el.dataset.touched !== "1") el.value = S.arenaWild[k] || 0; el.oninput = () => { el.dataset.touched = "1"; }; }
+  if (craft) $("#craftNote").textContent = `You have ${["c","u","r","m"].map(k => `${S.arenaWild[k] || 0} ${RARNAME[k]}`).join(", ")} wildcards (set them on the Collection tab, under Arena collection). Lower these to save some.`;
+  const cmdF = isCmdFmt(fmt);
+  $("#cmdField").hidden = !cmdF;
+  $("#bestCmdBtn").hidden = fmt !== "commander" || arena;
+  $("#colorField").hidden = cmdF;
   $("#colorPick").innerHTML = COLORS.map(x => `<button class="pipbtn ${x}" data-c="${x}" aria-pressed="${S.colorPick.has(x)}" aria-label="${CNAME[x]}">${x}</button>`).join("");
   $("#colorPick").querySelectorAll("button").forEach(b => b.onclick = () => { const x = b.dataset.c; S.colorPick.has(x) ? S.colorPick.delete(x) : S.colorPick.add(x); renderBuildForm(); });
   $("#themeChips").innerHTML = THEMES.map(t => `<button class="chip" data-t="${esc(t)}">${esc(t)}</button>`).join("");
@@ -872,11 +972,20 @@ function renderBuildForm(){
 }
 $("#fmt").onchange = renderBuildForm;
 function ownedCommanders(){ return [...S.coll.keys()].filter(i => canCommand(card(i)) && legalIn(card(i),"commander")); }
+// commanders for any build: paper ones you own, Arena ones you own, or (when crafting) any on Arena
+function commanderChoices(o){
+  if (!o.arena) return ownedCommanders();
+  const ok = i => canCommandIn(card(i), o.fmt) && legalIn(card(i), o.fmt);
+  if (!o.craft) return [...S.arena.keys()].filter(ok);
+  const out = []; for (let i = 0; i < S.cards.length; i++) if (ok(i)) out.push(i); return out;
+}
+const formOpts = () => ({ arena:S.buildMode === "arena", craft:S.buildMode === "arena" && $("#arenaCraft").checked, fmt:$("#fmt").value });
 $("#cmdInput").addEventListener("input", () => {
   const q = norm($("#cmdInput").value), box = $("#cmdSugg");
   if (!q) { box.hidden = true; return; }
-  const hits = ownedCommanders().filter(i => norm(card(i)[C.name]).includes(q)).slice(0, 12);
-  box.innerHTML = hits.length ? hits.map(i => `<button data-i="${i}">${esc(card(i)[C.name])} ${idPips(card(i)[C.id])}</button>`).join("") : `<div class="small muted" style="padding:10px 12px">No commander you own matches.</div>`;
+  const fo = formOpts(), owned = i => fo.arena ? S.arena.has(i) : true;
+  const hits = commanderChoices(fo).filter(i => norm(card(i)[C.name]).includes(q)).sort((a, b) => owned(b) - owned(a)).slice(0, 12);
+  box.innerHTML = hits.length ? hits.map(i => `<button data-i="${i}">${esc(card(i)[C.name])} ${idPips(card(i)[C.id])}${fo.craft && !S.arena.has(i) ? ` <span class="small muted">craft, ${RARNAME[rarOf(card(i))]}</span>` : ""}</button>`).join("") : `<div class="small muted" style="padding:10px 12px">No commander ${fo.arena && !fo.craft ? "you own on Arena " : fo.arena ? "" : "you own "}matches.</div>`;
   box.hidden = false;
   box.querySelectorAll("button").forEach(b => b.onclick = () => { $("#cmdInput").value = card(+b.dataset.i)[C.name]; box.hidden = true; });
 });
@@ -889,7 +998,32 @@ function lineFor(i, qty){
   const c = card(i), t = c[C.text].length > 150 ? c[C.text].slice(0,147) + "…" : c[C.text];
   return `${qty}|${c[C.name]}|${c[C.cost]}|${c[C.type]}${c[C.pt] ? "|"+c[C.pt] : "|"}|${t}`;
 }
+// how many copies a build may use, and how many of those it would craft (Arena only)
+function capFor(c, o){ const f = FMT[o.fmt]; return isBasic(c) || anyNumber(c) ? (o.arena ? 60 : Infinity) : f.max; }
+function makeArenaPool(o){
+  const words = themeWords(o.theme), allowed = o.identity, list = [];
+  const consider = i => {
+    const c = card(i);
+    if (!legalIn(c, o.fmt) || (o.commander != null && i === o.commander) || isBasic(c)) return;
+    if (allowed && ![...c[C.id]].every(x => allowed.includes(x))) return;
+    const own = Math.min(S.arena.get(i) || 0, capFor(c, o));
+    const canCraft = o.craft && (o.wild[rarOf(c)] || 0) > 0 && own < capFor(c, o);
+    if (!own && !canCraft) return;
+    list.push({ i, own, craft:canCraft, s: score(c, words) + (own ? 4 : 0) + (isLand(c) && c[C.id].length > 1 ? 2 : 0) });
+  };
+  if (o.craft) { for (let i = 0; i < S.cards.length; i++) consider(i); } else for (const i of S.arena.keys()) consider(i);
+  // everything owned first, then the craftable cards that best match the theme
+  list.sort((a,b) => (b.own > 0) - (a.own > 0) || b.s - a.s || card(a.i)[C.cmc] - card(b.i)[C.cmc]);
+  const BUDGET = 110000; let used = 0; const lines = []; let cut = 0;
+  for (const p of list) {
+    const c = card(p.i), t = c[C.text].length > 150 ? c[C.text].slice(0,147) + "…" : c[C.text];
+    const l = `${p.own}${p.craft ? "+" + rarOf(c) : ""}|${c[C.name]}|${c[C.cost]}|${c[C.type]}|${c[C.pt] || ""}|${t}`;
+    if (used + l.length > BUDGET) { cut++; continue; } used += l.length + 1; lines.push(l);
+  }
+  return { lines, cut, size:list.length };
+}
 function makePool(o){
+  if (o.arena) return makeArenaPool(o);
   const words = themeWords(o.theme), allowed = o.identity;
   const list = [];
   const inUse = usedFor(o);
@@ -911,9 +1045,10 @@ function makePool(o){
 const POWER = { casual:"Casual: fun and thematic over efficient, but still functional.", focused:"Focused: a coherent, tuned deck that plays well at a typical table.", competitive:"Competitive: as strong as the pool allows; prioritise efficiency, interaction and consistency." };
 function deckPrompt(o, pool, extra){
   const f = FMT[o.fmt], c = o.commander != null ? card(o.commander) : null;
-  const sizeRule = o.fmt === "commander"
-    ? `Commander: exactly 100 cards including the commander, so 99 in "cards" + "basics" combined. Singleton: qty 1 for every non-basic card. Every card's colour identity must fit within ${o.identity || "colorless"}.`
+  const sizeRule = isCmdFmt(o.fmt)
+    ? `${f.label}: exactly ${f.size} cards including the commander, so ${f.size - 1} in "cards" + "basics" combined. Singleton: qty 1 for every non-basic card. Every card's colour identity must fit within ${o.identity || "colorless"}.`
     : `${f.label}: exactly 60 cards in "cards" + "basics" combined. At most ${f.max} copies of any card except basic lands.${o.identity ? ` Stay within these colours: ${o.identity}.` : " Pick whatever colours the pool supports best (2 colours is usually most consistent)."}`;
+  if (o.arena) return arenaPrompt(o, pool, extra, sizeRule, c);
   return `You are an expert Magic: The Gathering deckbuilder. Build a deck for a player using ONLY cards they own in paper.
 
 FORMAT: ${sizeRule}
@@ -930,6 +1065,30 @@ Reply with only JSON in this shape:
 {"name":"short evocative deck name","summary":"one or two sentences on what the deck does","gameplan":"how to play it: early, mid and late game in 3-5 sentences","cards":[{"name":"Card Name","qty":1,"role":"ramp"}],"basics":{"Forest":10}}
 
 POOL (${pool.lines.length} cards; owned|name|cost|type|P/T|text):
+${pool.lines.join("\n")}`;
+}
+
+function arenaPrompt(o, pool, extra, sizeRule, c){
+  const w = o.wild || {};
+  return `You are an expert MTG Arena deckbuilder. Build a ${FMT[o.fmt].label} deck for MTG Arena${o.craft ? " from the player's Arena collection, crafting a few missing cards with wildcards where it clearly helps" : " using ONLY cards the player owns on Arena"}.
+
+FORMAT: ${sizeRule}
+${c ? `COMMANDER: ${c[0]} — ${c[1]} — ${c[3]}${c[7]?" "+c[7]:""} — ${c[6]}\n` : ""}PLAYER WANTS: ${o.theme || "Whatever the strongest, most fun deck in this pool is."}
+POWER: ${POWER[o.power]}
+
+RULES
+- Every card must come from POOL, spelled exactly as written there (including any "A-" prefix on rebalanced Alchemy cards).
+- The number before the first | is how many copies they own on Arena.${o.craft ? ` A "+c", "+u", "+r" or "+m" after it means more copies can be crafted with a wildcard of that rarity (common, uncommon, rare, mythic). Each copy beyond what they own costs one wildcard.
+- You may also craft strong cards that aren't in POOL, as long as they're on MTG Arena and legal in ${FMT[o.fmt].label}; validate_deck will reject any that aren't.
+- WILDCARDS AVAILABLE: ${w.c || 0} common, ${w.u || 0} uncommon, ${w.r || 0} rare, ${w.m || 0} mythic. Never spend more than this. Prefer cards they own; craft only where it makes a real difference, and say which in the role.` : " Never use more copies than they own."}
+- Basic lands are free on Arena: put them in "basics", not "cards".
+- Use a sensible land count and mana curve for the format${isCmdFmt(o.fmt) && FMT[o.fmt].size === 100 ? " (usually 35-38 lands plus ramp, card draw and removal)" : isCmdFmt(o.fmt) ? " (usually 23-25 lands for 60-card Brawl)" : " (usually 22-26 lands depending on the curve)"}.
+- Give each card a short role: one of ramp, draw, removal, interaction, threat, synergy, wincon, land, utility.
+${o.useTools ? "- Before your final answer, call validate_deck with your full draft. Fix every problem it reports and validate again until it reports none.\n" : ""}${extra ? extra + "\n" : ""}
+Reply with only JSON in this shape:
+{"name":"short evocative deck name","summary":"one or two sentences on what the deck does","gameplan":"how to play it: early, mid and late game in 3-5 sentences","cards":[{"name":"Card Name","qty":1,"role":"ramp"}],"basics":{"Forest":10}}
+
+POOL (${pool.lines.length} cards; owned${o.craft ? "[+craftable rarity]" : ""}|name|cost|type|P/T|text):
 ${pool.lines.join("\n")}`;
 }
 
@@ -951,21 +1110,47 @@ function validate(spec, o){
     basics[card(i)[C.name]] = (basics[card(i)[C.name]]||0) + qty;
   }
   const okCards = [];
+  if (o.arena) return validateArena(o, f, problems, merged, basics);
   for (const [i, v] of merged) {
     const c = card(i), name = c[C.name], owned = Math.max(0, (S.coll.get(i) || 0) - (usedFor(o).get(name)?.q || 0));
     if (o.commander === i) { problems.push(`${name} is the commander; don't list it in cards.`); continue; }
     if (o.basicsUnlimited && isBasic(c)) { basics[name] = (basics[name]||0) + v.qty; continue; }
     if (!owned) { problems.push(`${name}: ${S.coll.get(i) ? "every copy you own is in a built deck" : "not in the collection"}.`); continue; }
     if (!legalIn(c, o.fmt)) { problems.push(`${name}: not legal in ${f.label}.`); continue; }
-    if (o.identity !== undefined && o.fmt === "commander" && ![...c[C.id]].every(x => (o.identity||"").includes(x))) { problems.push(`${name}: outside the commander's colour identity.`); continue; }
+    if (o.identity !== undefined && isCmdFmt(o.fmt) && ![...c[C.id]].every(x => (o.identity||"").includes(x))) { problems.push(`${name}: outside the commander's colour identity.`); continue; }
     let qty = v.qty;
     const cap = isBasic(c) || anyNumber(c) ? owned : Math.min(owned, f.max);
     if (qty > cap) { problems.push(`${name}: ${qty} copies but the limit is ${cap}${cap === owned ? " (owned)" : ""}.`); qty = cap; }
     okCards.push({ i, name, qty, role: v.role });
   }
   const total = okCards.reduce((a,b)=>a+b.qty,0) + Object.values(basics).reduce((a,b)=>a+b,0) + (o.commander != null ? 1 : 0);
-  if (total !== f.size && !(o.fmt !== "commander" && total > f.size && total <= f.size + 2)) problems.push(`Deck has ${total} cards; it needs ${f.size}${o.commander != null ? " including the commander" : ""}.`);
+  if (total !== f.size && !(!isCmdFmt(o.fmt) && total > f.size && total <= f.size + 2)) problems.push(`Deck has ${total} cards; it needs ${f.size}${o.commander != null ? " including the commander" : ""}.`);
   return { problems, okCards, basics, total };
+}
+function validateArena(o, f, problems, merged, basics){
+  const okCards = [], spent = { c:0, u:0, r:0, m:0 }, crafts = [];
+  for (const [i, v] of merged) {
+    const c = card(i), name = c[C.name], own = S.arena.get(i) || 0, rar = rarOf(c);
+    if (o.commander === i) { problems.push(`${name} is the commander; don't list it in cards.`); continue; }
+    if (isBasic(c)) { basics[name] = (basics[name]||0) + v.qty; continue; }
+    if (!legalIn(c, o.fmt)) { problems.push(`${name}: not legal in ${f.label} on Arena.`); continue; }
+    if (o.identity !== undefined && isCmdFmt(o.fmt) && ![...c[C.id]].every(x => (o.identity||"").includes(x))) { problems.push(`${name}: outside the commander's colour identity.`); continue; }
+    let qty = v.qty; const cap = capFor(c, o);
+    if (qty > cap) { problems.push(`${name}: ${qty} copies but ${f.label} allows ${cap}.`); qty = cap; }
+    if (qty > own) {
+      if (!o.craft) { if (own) { problems.push(`${name}: only ${own} owned on Arena.`); qty = own; } else { problems.push(`${name}: not in the Arena collection.`); continue; } }
+      else {
+        const left = (o.wild[rar] || 0) - spent[rar], need = qty - own;
+        if (need > left) { problems.push(`${name}: crafting ${need} needs ${need} ${RARNAME[rar]} wildcard${need > 1 ? "s" : ""}, only ${Math.max(0, left)} left.`); qty = own + Math.max(0, left); }
+        const made = qty - own; if (made > 0) { spent[rar] += made; crafts.push({ name, qty:made, rar }); }
+        if (!qty) continue;
+      }
+    }
+    okCards.push({ i, name, qty, role: v.role });
+  }
+  const total = okCards.reduce((a,b)=>a+b.qty,0) + Object.values(basics).reduce((a,b)=>a+b,0) + (o.commander != null ? 1 : 0);
+  if (total !== f.size && !(!isCmdFmt(o.fmt) && total > f.size && total <= f.size + 2)) problems.push(`Deck has ${total} cards; it needs ${f.size}${o.commander != null ? " including the commander" : ""}.`);
+  return { problems, okCards, basics, total, spent, crafts };
 }
 function fillBasics(v, o){
   const f = FMT[o.fmt]; let short = f.size - v.total;
@@ -995,19 +1180,19 @@ function busy(on){
 $("#stopBtn").onclick = () => S.ctl?.abort();
 
 async function pickCommander(o){
-  const words = themeWords(o.theme);
-  const cands = ownedCommanders().map(i => ({ i, s: score(card(i), words) })).sort((a,b) => b.s - a.s).slice(0, 260);
+  const words = themeWords(o.theme), src = o.arena ? S.arena : S.coll;
+  const cands = commanderChoices(o).filter(i => !o.arena || src.has(i) || (o.wild[rarOf(card(i))] || 0) > 0).map(i => ({ i, s: score(card(i), words) + (src.has(i) ? 5 : 0) })).sort((a,b) => b.s - a.s).slice(0, 260);
   if (!cands.length) throw { code:"_nocmd" };
-  const prompt = `Pick the best commander for a Commander deck from the legendary cards this player owns. Prefer one whose colours the rest of their collection supports.
+  const prompt = `Pick the best commander for a ${FMT[o.fmt].label} deck from these legendary cards${o.arena ? (o.craft ? " (the player's MTG Arena collection plus cards they could craft; prefer ones they own)" : " the player owns on MTG Arena") : " this player owns"}. Prefer one whose colours the rest of their collection supports.
 Player wants: ${o.theme || "the strongest, most fun deck available"}. ${POWER[o.power]}
-Their collection by colour (cards owned): ${COLORS.map(x => `${x}:${[...S.coll].filter(([i])=>card(i)[C.id].includes(x)).reduce((a,[,q])=>a+q,0)}`).join(" ")}
+Their collection by colour (cards owned): ${COLORS.map(x => `${x}:${[...src].filter(([i])=>card(i)[C.id].includes(x)).reduce((a,[,q])=>a+q,0)}`).join(" ")}
 Reply with only JSON: {"commander":"exact name","why":"one sentence"}
 CANDIDATES (name|cost|type|text):
 ${cands.map(p => { const c = card(p.i); return `${c[0]}|${c[1]}|${c[3]}|${c[6].slice(0,140)}`; }).join("\n")}`;
   stage("Choosing a commander");
   const r = await S.sample.json(prompt, { modelTier:o.depth === "complex" ? "default" : o.depth, signal:S.ctl.signal, cache:false });
   const i = lookup(r?.commander);
-  if (i < 0 || !S.coll.has(i)) return cands[0].i;
+  if (i < 0 || !cands.some(x => x.i === i)) return cands[0].i;
   return i;
 }
 
@@ -1021,9 +1206,9 @@ async function runDeckCall(o, extra){
     name:"validate_deck",
     description:"Checks a draft deck against the player's collection, the format rules and the card count. Returns the card total and a list of problems to fix (empty when the deck is valid).",
     inputSchema:{ type:"object", properties:{ cards:{ type:"array", items:{ type:"object", properties:{ name:{type:"string"}, qty:{type:"integer"} }, required:["name","qty"] } }, basics:{ type:"object", additionalProperties:{type:"integer"} } }, required:["cards"] },
-    execute(input){ rounds++; stage(`Checking draft ${rounds} against your collection`); const v = validate({ cards: Array.isArray(input.cards) ? input.cards : [], basics: input.basics || {} }, o); return { total:v.total, problems:v.problems.slice(0,40) }; }
+    execute(input){ rounds++; stage(`Checking draft ${rounds} against your ${o.arena ? "Arena " : ""}collection`); const v = validate({ cards: Array.isArray(input.cards) ? input.cards : [], basics: input.basics || {} }, o); return { total:v.total, problems:v.problems.slice(0,40) }; }
   }] : undefined;
-  stage(o.fmt === "commander" ? `Building around ${card(o.commander)[C.name]}` : "Building from your cards");
+  stage(isCmdFmt(o.fmt) ? `Building around ${card(o.commander)[C.name]}` : o.arena ? "Building from your Arena cards" : "Building from your cards");
   let chars = 0;
   const opts = { modelTier:o.depth, signal:S.ctl.signal, onText:({ text }) => { chars = text.length; $("#stream").textContent = text.slice(-220); } };
   if (tools) opts.tools = tools; else opts.cache = false;
@@ -1040,30 +1225,41 @@ function toDeck(o, res, prevId){
   const dropped = v.problems.filter(p => !/^Deck has/.test(p));
   if (dropped.length) warnings.push({ kind:"warn", text:`Removed or trimmed ${dropped.length} card${dropped.length>1?"s":""} that broke a rule: ${dropped.slice(0,6).join(" ")}${dropped.length>6?" …":""}` });
   if (filled) warnings.push({ kind:"warn", text:`Added ${filled} basic land${filled>1?"s":""} to reach ${FMT[o.fmt].size} cards.` });
-  if (pool.cut) warnings.push({ kind:"warn", text:`Your pool was large, so ${pool.cut} lower-match cards weren't shown to Claude. A more specific theme or colour pick widens what it sees.` });
+  if (pool.cut && !o.craft) warnings.push({ kind:"warn", text:`Your pool was large, so ${pool.cut} lower-match cards weren't shown to Claude. A more specific theme or colour pick widens what it sees.` });
+  if (o.arena && !o.craft && v.okCards.length === 0) warnings.push({ kind:"bad", text:"None of the picked cards are in your Arena collection." });
   const total = v.okCards.reduce((a,b)=>a+b.qty,0) + Object.values(v.basics).reduce((a,b)=>a+b,0) + (o.commander != null ? 1 : 0);
   if (total < FMT[o.fmt].size) warnings.push({ kind:"bad", text:`The deck is ${FMT[o.fmt].size - total} cards short. Ask for a fix below.` });
   return { id: prevId || Math.random().toString(36).slice(2,10), name: String(spec.name || "Untitled deck").slice(0,80), summary: String(spec.summary || ""), gameplan: String(spec.gameplan || ""),
     format:o.fmt, commander: o.commander != null ? card(o.commander)[C.name] : null, identity:o.identity || "",
     cards: v.okCards.map(e => ({ name:e.name, qty:e.qty, role:e.role })), basics: v.basics, warnings, total,
-    opts:{ fmt:o.fmt, power:o.power, theme:o.theme, depth:o.depth, basicsUnlimited:o.basicsUnlimited, colors:o.colors || "", freeOnly:!!o.freeOnly }, createdAt: Date.now(), saved:false };
+    ...(o.arena ? { arena:true } : {}),
+    opts:{ fmt:o.fmt, power:o.power, theme:o.theme, depth:o.depth, basicsUnlimited:o.basicsUnlimited, colors:o.colors || "", freeOnly:!!o.freeOnly,
+      ...(o.arena ? { arena:true, craft:!!o.craft, wild:{ ...o.wild } } : {}) }, createdAt: Date.now(), saved:false };
 }
 
 async function build(){
   $("#buildMsg").innerHTML = "";
-  if (!S.coll.size) return alertMsg("#buildMsg", "Import your collection first, on the Collection tab.");
+  const arena = S.buildMode === "arena";
+  if (arena && !hasArenaData()) return alertMsg("#buildMsg", "The app's card list doesn't know which cards are on Arena yet. Run the weekly GitHub job once (see Settings, Card data), then try again.");
+  if (arena && !S.arena.size && !$("#arenaCraft").checked) return alertMsg("#buildMsg", "Import your Arena collection first (Collection tab, Arena collection), or choose to craft cards.");
+  if (!arena && !S.coll.size) return alertMsg("#buildMsg", "Import your collection first, on the Collection tab.");
   if (!S.sample) return showKeyNeeded("#buildMsg");
-  const o = { fmt:$("#fmt").value, power:$("#power").value, theme:$("#theme").value.trim(), depth:$("#depth").value, basicsUnlimited:$("#basics").checked, freeOnly:$("#freeOnly").checked };
+  const o = { fmt:$("#fmt").value, power:$("#power").value, theme:$("#theme").value.trim(), depth:$("#depth").value, basicsUnlimited:arena ? true : $("#basics").checked, freeOnly:arena ? false : $("#freeOnly").checked };
+  if (arena) { o.arena = true; o.craft = $("#arenaCraft").checked; o.wild = {}; for (const k of ["c","u","r","m"]) o.wild[k] = o.craft ? Math.max(0, Math.min(S.arenaWild[k] || 0, parseInt($("#cap_" + k).value, 10) || 0)) : 0; }
   S.ctl = new AbortController(); busy(true); $("#deckView").innerHTML = "";
   try {
-    if (o.fmt === "commander") {
+    if (isCmdFmt(o.fmt)) {
       const typed = $("#cmdInput").value.trim();
       if (typed) {
         const i = lookup(typed);
-        if (i < 0 || !S.coll.has(i)) throw { code:"_cmdmissing", name:typed };
-        if (!canCommand(card(i))) throw { code:"_notcmd", name:card(i)[C.name] };
+        if (i < 0 || !(o.arena ? (S.arena.has(i) || (o.craft && legalIn(card(i), o.fmt))) : S.coll.has(i))) throw { code:"_cmdmissing", name:typed };
+        if (!canCommandIn(card(i), o.fmt)) throw { code:"_notcmd", name:card(i)[C.name] };
+        if (o.arena && !S.arena.has(i)) { const r = rarOf(card(i)); if ((o.wild[r] || 0) < 1) throw { code:"_cmdwild", name:card(i)[C.name], rar:r }; o.wild[r]--; o.cmdCrafted = r; }
         o.commander = i;
-      } else o.commander = await pickCommander(o);
+      } else {
+        o.commander = await pickCommander(o);
+        if (o.arena && !S.arena.has(o.commander)) { const r = rarOf(card(o.commander)); if ((o.wild[r] || 0) < 1) throw { code:"_nocmd" }; o.wild[r]--; }
+      }
       o.identity = card(o.commander)[C.id];
     } else {
       o.commander = null;
@@ -1075,8 +1271,9 @@ async function build(){
     renderDeck();
   } catch (e) {
     if (e?.code === "cancelled") alertMsg("#buildMsg", "Stopped.", "ok");
-    else if (e?.code === "_nocmd") alertMsg("#buildMsg", "You don't own any legendary creatures that can lead a Commander deck.");
-    else if (e?.code === "_cmdmissing") alertMsg("#buildMsg", `"${e.name}" isn't in your collection. Pick one from the suggestions or leave it blank.`);
+    else if (e?.code === "_nocmd") alertMsg("#buildMsg", o.arena ? `No commander for ${FMT[o.fmt].label} in your Arena collection${o.craft ? " or within your wildcards" : ""}.` : "You don't own any legendary creatures that can lead a Commander deck.");
+    else if (e?.code === "_cmdmissing") alertMsg("#buildMsg", `"${e.name}" isn't in your ${o.arena ? "Arena " : ""}collection${o.arena ? ` or isn't legal in ${FMT[o.fmt].label}` : ""}. Pick one from the suggestions or leave it blank.`);
+    else if (e?.code === "_cmdwild") alertMsg("#buildMsg", `Crafting ${e.name} needs a ${RARNAME[e.rar]} wildcard, and none are left in your limit.`);
     else if (e?.code === "_notcmd") alertMsg("#buildMsg", `${e.name} can't be a commander. It needs to be a legendary creature or say it can be your commander.`);
     else if (e?.code === "_smallpool") alertMsg("#buildMsg", "Too few of your cards fit those choices to make a deck. Try other colours or another format.");
     else alertMsg("#buildMsg", errText(e), "bad");
@@ -1127,19 +1324,19 @@ function renderDeck(){
   const order = [...GROUPS.map(g => g[0]), "Other"];
   const cmdIdx = d.commander ? lookup(d.commander) : -1;
   view.innerHTML = `<div class="panel">
-    <div class="decktop"><div class="grow"><span class="label">${esc(f.label)}${d.commander ? "" : d.identity ? " · " + d.identity : ""}</span><h2 id="deckName">${esc(d.name)}</h2><button class="ghost" id="renameBtn" style="min-height:30px;padding:3px 10px;font-size:.8rem">Rename</button></div>
+    <div class="decktop"><div class="grow"><span class="label">${d.arena ? "MTG Arena · " : ""}${esc(f.label)}${d.commander ? "" : d.identity ? " · " + d.identity : ""}</span><h2 id="deckName">${esc(d.name)}</h2><button class="ghost" id="renameBtn" style="min-height:30px;padding:3px 10px;font-size:.8rem">Rename</button></div>
       <span class="count ${total >= f.size ? "ok" : "short"}">${total}/${f.size}</span></div>
     ${cmdIdx >= 0 ? `<div class="list">${cardRow(cmdIdx, 1, "commander")}</div>` : ""}
     ${d.summary ? `<p>${esc(d.summary)}</p>` : ""}
-    <p class="small muted">Value of these cards: <b class="price">${money(d.cards.reduce((a,e) => { const i = lookup(e.name); return a + (i < 0 ? 0 : e.qty * unitOwned(i)); }, 0) + (cmdIdx >= 0 ? unitOwned(cmdIdx) : 0))}</b></p>
+    ${d.arena ? arenaNeedHTML(d) : `<p class="small muted">Value of these cards: <b class="price">${money(d.cards.reduce((a,e) => { const i = lookup(e.name); return a + (i < 0 ? 0 : e.qty * unitOwned(i)); }, 0) + (cmdIdx >= 0 ? unitOwned(cmdIdx) : 0))}</b></p>`}
     ${d.gameplan ? `<details><summary>How to play it</summary><p style="margin-top:6px">${esc(d.gameplan)}</p></details>` : ""}
     ${d.warnings.map(w => `<div class="notice ${w.kind}">${esc(w.text)}</div>`).join("")}
     <div class="row">
       <button class="primary grow" id="saveDeckBtn">${d.saved ? "Saved" : "Save deck"}</button>
-      <button class="grow" id="copyBtn">Copy list</button>
+      <button class="grow" id="copyBtn">${d.arena ? "Copy for Arena" : "Copy list"}</button>
     </div>
-    <label class="row small builtbox"><input type="checkbox" id="deckBuilt" ${d.built ? "checked" : ""}> I've built this deck, so its cards are in use${d.saved ? recordText(d.id) : ""}</label>
-    <div id="deckConflicts" class="small">${conflictHTML(d)}</div>
+    ${d.arena ? `<p class="small muted">In Arena: Decks, Import. It reads the copied list straight from your clipboard.${d.saved ? recordText(d.id) : ""}</p>` : `<label class="row small builtbox"><input type="checkbox" id="deckBuilt" ${d.built ? "checked" : ""}> I've built this deck, so its cards are in use${d.saved ? recordText(d.id) : ""}</label>
+    <div id="deckConflicts" class="small">${conflictHTML(d)}</div>`}
     <textarea id="copyArea" hidden readonly></textarea>
   </div>
   <div class="panel">
@@ -1164,7 +1361,7 @@ function renderDeck(){
     <div class="row"><input type="text" id="tweakInput" class="grow" placeholder="Swap the artifacts for more dragons" style="flex:1"><button id="tweakBtn" data-tweak="" data-claude>Ask</button></div>
     <div id="tweakMsg"></div>
   </div>
-  <div class="panel">
+  ${d.arena ? "" : `<div class="panel">
     <h3>Upgrade on a budget</h3>
     <p class="small muted">Claude suggests cards to buy and what each replaces, then real Scryfall prices trim the list to your budget.</p>
     <div class="row"><label for="budgetIn" class="label" style="margin:0">Budget $</label><input type="text" inputmode="decimal" id="budgetIn" value="${esc(d.lastBudget || "20")}" style="width:6.5em;flex:none"><button class="primary grow" id="budgetBtn" data-claude>Suggest upgrades</button></div>
@@ -1175,23 +1372,23 @@ function renderDeck(){
     <p class="small muted">${d.format === "commander" ? "Estimates the Commander bracket from Game Changers, mass land denial, extra turns and two-card combos, and lists the combos in this deck." : "Lists the combos in this deck and ones it's one card away from."}</p>
     <div class="row"><button class="grow" id="deckBracketBtn">${d.format === "commander" ? "Check bracket and combos" : "Find combos"}</button></div>
     <div id="deckBracket"></div>
-  </div>
+  </div>`}
   <div class="panel">
     <h3>Share</h3>
     <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button><button id="forgeBtn">Play it in Forge</button></div>
     <div id="shareOut"></div>
   </div>
-  <div class="panel">
+  ${d.arena ? "" : `<div class="panel">
     <h3>Proxies</h3>
     <p class="small muted">Print stand-ins for cards you don't have free, so you can play the deck before buying. Sleeve each one in front of a basic land.</p>
     <div class="row"><button class="grow" id="proxyBtn">Print proxies</button></div>
     <div id="proxyOut"></div>
-  </div>
+  </div>`}
   <div class="panel">
     <h3>Mana base</h3>
     <div id="manaOut"></div>
   </div>
-  ${d.saved ? `<div class="panel">
+  ${d.saved && !d.arena ? `<div class="panel">
     <h3>${d.built ? "Unbuild" : "Pull list"}</h3>
     <p class="small muted">${d.built ? "Taking this deck apart? See where each card goes back, then free its cards for other decks." : "Gather this deck's cards, ticking them off as you go. Tick everything and it's marked as built."}</p>
     <div class="row"><button class="grow" id="pullBtn">${d.built ? "Show where cards go back" : (Object.keys(d.pulled || {}).length ? "Continue pull list" : "Start pull list")}</button></div>
@@ -1199,15 +1396,15 @@ function renderDeck(){
   </div>` : ""}
   ${(d.versions || []).length ? `<div class="panel"><h3>History <span class="num muted">${d.versions.length} version${d.versions.length === 1 ? "" : "s"}</span></h3><div id="histOut"></div></div>` : ""}`;
   bindCardRows(view);
-  $("#deckBuilt").onchange = e => setBuilt(d, e.target.checked);
+  if ($("#deckBuilt")) $("#deckBuilt").onchange = e => setBuilt(d, e.target.checked);
   $("#renameBtn").onclick = () => renameDeck(d);
-  $("#budgetBtn").onclick = () => budgetUpgrade(d);
+  if ($("#budgetBtn")) $("#budgetBtn").onclick = () => budgetUpgrade(d);
   $("#evalDeckBtn").onclick = () => evaluateSavedDeck(d);
   if (d.eval) renderDeckEval(d);
-  $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
+  if ($("#deckBracketBtn")) $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
   $("#shareBtn").onclick = () => shareDeck(d);
   $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
-  $("#proxyBtn").onclick = () => {
+  if ($("#proxyBtn")) $("#proxyBtn").onclick = () => {
     const short = new Map(shortfalls(d).map(x => [x.n, x.q - x.free]));
     proxyPanel($("#proxyOut"), deckEntries(d).filter(([n]) => { const i = lookup(n); return i >= 0 && !isBasic(card(i)); }).map(([n, q]) => ({ name:n, qty:q, def:short.get(n) || 0 })));
   };
@@ -1218,8 +1415,8 @@ function renderDeck(){
   if ($("#histOut")) renderHistory(d);
   $("#saveDeckBtn").onclick = async () => { await saveDeck(S.current); $("#saveDeckBtn").textContent = "Saved"; };
   $("#copyBtn").onclick = () => {
-    const t = deckText(d);
-    navigator.clipboard?.writeText(t).then(() => { $("#copyBtn").textContent = "Copied"; setTimeout(() => $("#copyBtn") && ($("#copyBtn").textContent = "Copy list"), 1800); })
+    const t = d.arena ? arenaText(d) : deckText(d);
+    navigator.clipboard?.writeText(t).then(() => { $("#copyBtn").textContent = "Copied"; setTimeout(() => $("#copyBtn") && ($("#copyBtn").textContent = d.arena ? "Copy for Arena" : "Copy list"), 1800); })
       .catch(() => { const a = $("#copyArea"); a.hidden = false; a.value = t; a.style.minHeight = "180px"; a.focus(); a.select(); $("#copyBtn").textContent = "Select and copy below"; });
   };
   view.querySelectorAll("[data-tweak]").forEach(b => b.onclick = () => {
@@ -1245,7 +1442,7 @@ function parseDeckList(text){
     let name = (m ? m[2] : l).replace(/\s+\*[A-Za-z]+\*\s*$/,"").replace(/\s+\[[^\]]*\]\s*$/,"").replace(/\s+\([A-Za-z0-9]{2,6}\)(\s+[^\s]+)?\s*$/,"").replace(/\s+#.*$/,"").trim();
     if (!qty || !name) continue;
     const i = lookup(name);
-    if (i < 0) { res.unknown.set(name, (res.unknown.get(name)||0) + qty); continue; }
+    if (i < 0 || arenaOnly(card(i))) { res.unknown.set(name, (res.unknown.get(name)||0) + qty); continue; }
     if (s === "cmd") { if (!res.commanders.includes(i)) res.commanders.push(i); continue; }
     res.main.set(i, (res.main.get(i)||0) + qty);
   }
@@ -1477,9 +1674,9 @@ function renderSaved(){
   const box = $("#savedList");
   if (!S.decks.length) { box.innerHTML = `<div class="empty"><h3>No saved decks</h3><p class="small muted">Build one on the Build tab and tap Save deck. They're stored on this device.</p></div>`; return; }
   box.innerHTML = S.decks.map(d => `<div class="saved"><button class="open" data-id="${d.id}">${esc(d.name)}</button><span class="count num ${d.total >= FMT[d.format].size ? "ok":"short"}">${d.total}/${FMT[d.format].size}</span>
-    <span class="small muted">${esc(FMT[d.format].label)}${d.commander ? " · " + esc(d.commander) : ""} · ${new Date(d.createdAt).toLocaleDateString()}</span>
+    <span class="small muted">${d.arena ? `<span class="atag">Arena</span> ` : ""}${esc(FMT[d.format].label)}${d.commander ? " · " + esc(d.commander) : ""} · ${new Date(d.createdAt).toLocaleDateString()}</span>
     <span class="row" style="justify-content:flex-end"><button class="ghost danger small" data-del="${d.id}">Delete</button></span>
-    <label class="row small builtbox"><input type="checkbox" data-built="${d.id}" ${d.built ? "checked" : ""}> Built${recordText(d.id)}</label><span></span>
+    ${d.arena ? `<span class="small muted">${recordText(d.id).replace(/^ · /, "") || "MTG Arena deck"}</span><span></span>` : `<label class="row small builtbox"><input type="checkbox" data-built="${d.id}" ${d.built ? "checked" : ""}> Built${recordText(d.id)}</label><span></span>`}
     <div class="small conf">${conflictHTML(d, true)}</div></div>`).join("");
   box.querySelectorAll("[data-built]").forEach(cb => cb.onchange = () => { const d = S.decks.find(x => x.id === cb.dataset.built); if (d) setBuilt(d, cb.checked); });
   box.querySelectorAll("button.open").forEach(b => b.onclick = () => { S.current = S.decks.find(x => x.id === b.dataset.id); showTab("build"); renderDeck(); $("#deckView").scrollIntoView({ behavior:"smooth" }); });
@@ -1490,11 +1687,38 @@ function renderSaved(){
   });
 }
 
+/* ---------- Arena decks: what you'd still need to craft ---------- */
+function arenaNeeds(d){
+  const need = { c:0, u:0, r:0, m:0 }, list = [];
+  for (const [n, q] of deckEntries(d)) {
+    const i = lookup(n); if (i < 0) continue; const c = card(i); if (isBasic(c)) continue;
+    const short = q - (S.arena.get(i) || 0);
+    if (short > 0) { need[rarOf(c)] += short; list.push({ name:card(i)[C.name], qty:short, rar:rarOf(c) }); }
+  }
+  return { need, list, total:list.reduce((a, x) => a + x.qty, 0) };
+}
+const wildText = need => ["m","r","u","c"].filter(k => need[k]).map(k => `${need[k]} ${RARNAME[k]}`).join(", ");
+function arenaNeedHTML(d, compact){
+  const n = arenaNeeds(d);
+  if (!n.total) return `<div class="notice ok">You own every card on Arena.</div>`;
+  const over = ["c","u","r","m"].filter(k => n.need[k] > (S.arenaWild[k] || 0));
+  return `<div class="notice ${over.length ? "warn" : ""}">To craft: <b>${wildText(n.need)}</b> wildcard${n.total === 1 ? "" : "s"}${over.length ? ` (more ${over.map(k => RARNAME[k]).join(" and ")} than you have)` : ""}.
+    ${compact ? "" : `<details><summary class="small">Show the cards</summary><ul class="tight small">${n.list.sort((a, b) => "mruc".indexOf(a.rar) - "mruc".indexOf(b.rar)).map(x => `<li>${x.qty > 1 ? x.qty + "× " : ""}${esc(x.name)} <span class="muted">${RARNAME[x.rar]}</span></li>`).join("")}</ul></details>`}</div>`;
+}
+function arenaText(d){
+  const lines = [];
+  if (d.commander) lines.push("Commander", `1 ${d.commander}`, "");
+  lines.push("Deck");
+  for (const c of d.cards) lines.push(`${c.qty} ${c.name}`);
+  for (const [n, q] of Object.entries(d.basics || {})) lines.push(`${q} ${n}`);
+  return lines.join("\n");
+}
+
 /* ---------- built decks and card availability ---------- */
 function useMap(exceptId){
   const m = new Map();
   for (const d of S.decks || []) {
-    if (!d.built || d.id === exceptId) continue;
+    if (!d.built || d.arena || d.id === exceptId) continue;
     const add = (n, q) => { const e = m.get(n) || { q:0, decks:[] }; e.q += q; if (!e.decks.includes(d.name)) e.decks.push(d.name); m.set(n, e); };
     if (d.commander) add(d.commander, 1);
     for (const c of d.cards || []) add(c.name, c.qty);
@@ -1513,6 +1737,7 @@ function shortfalls(d){
   return out;
 }
 function conflictHTML(d, compact){
+  if (d.arena) return compact ? arenaNeedHTML(d, true) : "";
   if (!S.coll.size) return "";
   const s = shortfalls(d), shared = s.filter(x => x.decks.length), missing = s.filter(x => !x.decks.length);
   const parts = [];
@@ -1556,7 +1781,7 @@ function deckFromCards(name, cmap, opts = {}){
   }
   const existing = opts.source === "manabox" ? S.decks.find(x => x.source === "manabox" && x.name === name) : null;
   const d = { id: existing?.id || Math.random().toString(36).slice(2, 10), name, summary: existing?.summary || "", gameplan: existing?.gameplan || "",
-    format:fmt, commander: cmd != null ? card(cmd)[C.name] : null, identity: cmd != null ? card(cmd)[C.id] : "",
+    format:fmt, ...(FMT[fmt]?.arena ? { arena:true } : {}), commander: cmd != null ? card(cmd)[C.name] : null, identity: cmd != null ? card(cmd)[C.id] : "",
     cards, basics, warnings:[], total,
     opts:{ fmt, power:"focused", theme:"", depth:"default", basicsUnlimited:true, colors:"", freeOnly:true },
     createdAt: existing?.createdAt || Date.now(), saved:true, built: existing ? existing.built : !!opts.built, source: opts.source || "" };
@@ -1835,7 +2060,7 @@ function newHand(mull){
   if (lib.length < 7) { $("#drawInfo").textContent = "That deck has fewer than 7 cards."; return; }
   const m = mull ? (S.draw?.mull || 0) + 1 : 0;
   const deck = shuffled(lib);
-  S.draw = { src, cmd, fmt, lib:deck.slice(7), hand:deck.slice(0, 7), mull:m, turn:0, toBottom: fmt === "commander" ? Math.max(0, m - 1) : m, open:new Set() };
+  S.draw = { src, cmd, fmt, lib:deck.slice(7), hand:deck.slice(0, 7), mull:m, turn:0, toBottom: isCmdFmt(fmt) ? Math.max(0, m - 1) : m, open:new Set() };
   renderDraw();
 }
 function renderDraw(){
@@ -1858,7 +2083,7 @@ function renderDrawStats(){
   if (!src) { box.innerHTML = ""; return; }
   const { lib, fmt } = libraryFor(src), N = lib.length; if (N < 7) { box.innerHTML = ""; return; }
   const L = lib.filter(i => isLand(card(i))).length;
-  const play = fmt !== "commander";
+  const play = !isCmdFmt(fmt);
   const keep = [2, 3, 4, 5].reduce((a, k) => a + hyp(N, L, 7, k), 0);
   const uniq = [...new Set(lib.filter(i => !isLand(card(i))))].sort((a, b) => card(a)[C.name].localeCompare(card(b)[C.name]));
   const key = S.drawKey != null && uniq.includes(S.drawKey) ? S.drawKey : uniq[0];
@@ -1973,9 +2198,9 @@ async function evaluateSavedDeck(d){
   // spare cards the player owns that this deck could use
   const used = useMap(d.id), words = themeWords(entries.map(([n]) => { const i = lookup(n); return i >= 0 ? card(i)[C.type] + " " + card(i)[C.text] : ""; }).join(" ")).slice(0, 40);
   const pool = [];
-  for (const [i, q] of S.coll) {
+  for (const [i, q] of (d.arena ? S.arena : S.coll)) {
     const c = card(i); if (inDeck.has(c[C.name]) || isBasic(c)) continue;
-    const spare = q - (used.get(c[C.name])?.q || 0); if (spare <= 0) continue;
+    const spare = q - (d.arena ? 0 : (used.get(c[C.name])?.q || 0)); if (spare <= 0) continue;
     if (d.format !== "casual" && !legalIn(c, d.format)) continue;
     if (d.commander && ![...c[C.id]].every(x => ident.includes(x))) continue;
     pool.push({ i, q:spare, s:score(c, words) });
@@ -1983,13 +2208,13 @@ async function evaluateSavedDeck(d){
   pool.sort((a, b) => b.s - a.s);
   const alts = []; let used2 = 0;
   for (const p of pool) { const l = lineFor(p.i, p.q); if (used2 + l.length > 60000) break; used2 += l.length + 1; alts.push(l); }
-  const prompt = `You are an expert Magic: The Gathering player reviewing a ${f.label} deck${d.source === "precon" ? " (an official preconstructed deck the player owns)" : ""}.
+  const prompt = `You are an expert Magic: The Gathering player reviewing a ${f.label} deck${d.arena ? " for MTG Arena" : ""}${d.source === "precon" ? " (an official preconstructed deck the player owns)" : ""}.
 ${d.commander ? `COMMANDER: ${d.commander} (colour identity ${ident || "colorless"})\n` : ""}
 TASKS
 1. Rate the deck as it stands from 1 to 10 for its format, give a short honest verdict, 2-4 strengths and 2-4 weaknesses.
 2. Explain how to play it in 3-5 sentences: early, mid and late game, and what to mulligan for.
-3. Suggest up to 8 swaps using ONLY cards from SPARE CARDS (the player owns them and they aren't in another built deck). Each swap takes out one specific weak card from the deck and puts in a better one. Use exact names. Only suggest swaps that clearly improve the deck.
-4. Suggest up to 5 cards the player doesn't own that would improve it most, preferring affordable ones.
+3. Suggest up to 8 swaps using ONLY cards from SPARE CARDS (${d.arena ? "cards the player owns on Arena" : "the player owns them and they aren't in another built deck"}). Each swap takes out one specific weak card from the deck and puts in a better one. Use exact names. Only suggest swaps that clearly improve the deck.
+4. Suggest up to 5 cards the player doesn't own that would improve it most, ${d.arena ? "to craft with wildcards on Arena (they must be on Arena and legal in the format), preferring lower rarities" : "preferring affordable ones"}.
 
 Reply with only JSON:
 {"rating":7,"verdict":"…","strengths":["…"],"weaknesses":["…"],"gameplan":"…","swaps":[{"out":"Card In Deck","in":"Spare Card","why":"short reason"}],"buys":[{"name":"Card Name","why":"short reason"}]}
@@ -2017,12 +2242,12 @@ ${alts.join("\n") || "(none)"}`;
     const buys = [];
     for (const b of Array.isArray(r?.buys) ? r.buys : []) {
       const i = lookup(b?.name); if (i < 0) continue; const c = card(i);
-      if (inDeck.has(c[C.name]) || (S.coll.get(i) || 0) > 0 || buys.some(x => x.name === c[C.name])) continue;
+      if (inDeck.has(c[C.name]) || ((d.arena ? S.arena : S.coll).get(i) || 0) > 0 || buys.some(x => x.name === c[C.name])) continue;
       if (d.format !== "casual" && !legalIn(c, d.format)) continue;
       if (d.commander && ![...c[C.id]].every(x => ident.includes(x))) continue;
       buys.push({ name:c[C.name], why:String(b.why || "") });
     }
-    try { await cheapestPrices(buys.map(b => b.name)); } catch {}
+    if (!d.arena) { try { await cheapestPrices(buys.map(b => b.name)); } catch {} }
     d.eval = { at:Date.now(), rating:Math.max(1, Math.min(10, Math.round(+r?.rating || 0))) || "?", verdict:String(r?.verdict || ""),
       strengths:(r?.strengths || []).map(String).slice(0, 5), weaknesses:(r?.weaknesses || []).map(String).slice(0, 5), gameplan:String(r?.gameplan || ""), swaps, buys };
     if (!d.gameplan && d.eval.gameplan) d.gameplan = d.eval.gameplan;
@@ -2041,11 +2266,11 @@ function renderDeckEval(d){
     ${ev.strengths.length ? `<div><span class="label">Strengths</span><ul class="tight small">${ev.strengths.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
     ${ev.weaknesses.length ? `<div><span class="label">Weaknesses</span><ul class="tight small">${ev.weaknesses.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
     ${ev.gameplan ? `<details><summary class="small">How to play it</summary><p class="small" style="margin-top:6px">${esc(ev.gameplan)}</p></details>` : ""}
-    ${ev.swaps.length ? `<div style="margin-top:8px"><span class="label">Swaps from your collection</span>
+    ${ev.swaps.length ? `<div style="margin-top:8px"><span class="label">Swaps from your ${d.arena ? "Arena " : ""}collection</span>
       ${ev.swaps.map((s2, k) => { const done = stale.includes(s2); return `<label class="pullrow ${done ? "done" : ""}"><input type="checkbox" data-sw="${k}" ${done ? "disabled" : "checked"}><span><span class="need">${esc(s2.out)}</span> → <span class="have">${esc(s2.in)}</span>${s2.why ? `<br><span class="small muted">${esc(s2.why)}</span>` : ""}${done ? ` <span class="small muted">(done)</span>` : ""}</span></label>`; }).join("")}
       ${ev.swaps.length > stale.length ? `<div class="row" style="margin-top:6px"><button class="primary grow" id="applySwaps">Apply ticked swaps</button></div>` : ""}</div>` : `<p class="small muted">No swaps from your collection would clearly improve it.</p>`}
-    ${ev.buys.length ? `<div style="margin-top:10px"><span class="label">Worth buying</span><ul class="tight small">${ev.buys.map(b => { const i = lookup(b.name); return `<li><b>${esc(b.name)}</b> <span class="price">${i >= 0 ? money(buyPrice(i)) : ""}</span>${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`; }).join("")}</ul>
-      <div class="row" style="margin-top:6px"><button class="grow" id="evalWish">Add these to my wishlist</button></div></div>` : ""}
+    ${ev.buys.length ? `<div style="margin-top:10px"><span class="label">${d.arena ? "Worth crafting" : "Worth buying"}</span><ul class="tight small">${ev.buys.map(b => { const i = lookup(b.name); return `<li><b>${esc(b.name)}</b> ${d.arena ? `<span class="muted">${i >= 0 ? RARNAME[rarOf(card(i))] : ""}</span>` : `<span class="price">${i >= 0 ? money(buyPrice(i)) : ""}</span>`}${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`; }).join("")}</ul>
+      ${d.arena ? "" : `<div class="row" style="margin-top:6px"><button class="grow" id="evalWish">Add these to my wishlist</button></div>`}</div>` : ""}
     <div id="deckEvalMsg"></div>`;
   if ($("#applySwaps")) $("#applySwaps").onclick = async () => {
     const picks = [...box.querySelectorAll("[data-sw]:checked")].map(x => ev.swaps[+x.dataset.sw]);
@@ -2060,7 +2285,7 @@ function renderDeckEval(d){
     d._note = `Claude's swaps (${picks.length})`;
     S.current = d; if (d.saved) await saveDeck(d);
     renderDeck();
-    $("#deckEvalMsg") && ($("#deckEvalMsg").innerHTML = `<div class="notice ok">Swapped ${picks.length} card${picks.length === 1 ? "" : "s"}.${d.built ? " Pull the new cards from your collection and put the old ones away." : ""}</div>`);
+    $("#deckEvalMsg") && ($("#deckEvalMsg").innerHTML = `<div class="notice ok">Swapped ${picks.length} card${picks.length === 1 ? "" : "s"}.${d.arena ? " Copy it for Arena again to update the deck there." : d.built ? " Pull the new cards from your collection and put the old ones away." : ""}</div>`);
   };
   if ($("#evalWish")) $("#evalWish").onclick = () => { const n = addToWish(ev.buys.map(b => [b.name, 1])); $("#deckEvalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist.</div>`; };
 }
@@ -2533,7 +2758,7 @@ function needSources(N, k, turn, play){
 function manaPanel(box, entries, commander, fmt){
   const all = [...entries, ...(commander ? [[commander, 1]] : [])].map(([n, q]) => [lookup(n), q]).filter(([i]) => i >= 0);
   if (!all.length) { box.innerHTML = ""; return; }
-  const isCmd = fmt === "commander", play = !isCmd;
+  const isCmd = isCmdFmt(fmt), play = !isCmd;
   const ident = commander ? card(lookup(commander))[C.id] : [...new Set(all.flatMap(([i]) => [...card(i)[C.id]]))].join("");
   const N = all.reduce((a, [, q]) => a + q, 0) - (commander ? 1 : 0);
   const lands = all.filter(([i]) => isLand(card(i))), spells = all.filter(([i]) => !isLand(card(i)));
@@ -2683,7 +2908,7 @@ $("#gnGo").onclick = () => {
 };
 
 /* ================= sync through a private GitHub Gist ================= */
-const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn","dw.upc"];
+const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn","dw.upc","dw.arena"];
 const SYNC_FILE = "deckwright-sync.json", GH = "https://api.github.com";
 const syncCfg = () => { try { return JSON.parse(localStorage.getItem("dw.sync")) || {}; } catch { return {}; } };
 const saveSyncCfg = c => { try { localStorage.setItem("dw.sync", JSON.stringify(c)); } catch {} };
@@ -2996,6 +3221,7 @@ function showLookup(i){
         ${c[C.flags] & 32 ? ` · <b>Can be your commander</b>` : ""}${c[C.flags] & 64 ? ` · <b>Game Changer</b> (counts toward the Bracket 3 limit)` : ""}${isDigital(name) ? ` · <b>Arena-only</b>` : ""}</p>
       <div class="cpills" style="margin:6px 0">${legal}</div>
       <p class="small"><span class="label">Price</span> ${p ? money(p) : "no price"}${pf && pf !== p ? ` · foil ${money(pf)}` : ""}${cheap ? ` · cheapest printing ${money(cheap)}` : ""}</p>
+      ${hasArenaData() ? `<p class="small"><span class="label">MTG Arena</span> ${onArena(c) ? `${arenaOnly(c) ? "<b>Arena only</b> · " : ""}${RARNAME[rarOf(c)]} · ${ARENA_FMTS.filter(f => legalIn(c, f)).map(f => FMT[f].label.replace(" (Arena)", "")).join(", ") || "not legal in any Arena format"}${S.arena.size ? ` · you own ${S.arena.get(i) || 0} there` : ""}` : "Not on Arena"}</p>` : ""}
       <p class="small"><span class="label">You own</span> ${own ? `${own} cop${own === 1 ? "y" : "ies"}${used ? ` · in ${used.decks.map(esc).join(", ")}` : ""}` : "none"}<span id="lookCombo"></span></p>
       <div id="lookWhere"></div>
       <p class="small muted" id="lookMeta"></p>
@@ -3192,7 +3418,7 @@ function forgePaste(o){
   return `${cmd.length ? `Commander\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n\nMain\n` : ""}${main.map(([n, q]) => `${q} ${n}`).join("\n")}`;
 }
 function forgePanel(box, o){
-  const isCmd = o.format === "commander" || o.commanders.length;
+  const isCmd = isCmdFmt(o.format) || o.commanders.length;
   box.innerHTML = `<div class="notice" style="margin-top:8px"><b>Play this deck against the computer in Forge</b>
     <p class="small">Forge is a free Magic program with the full rules and an AI opponent. It runs on Android and PC. Get it from <a href="https://github.com/Card-Forge/forge/releases" target="_blank" rel="noopener">Forge's releases page</a>.</p>
     <ol class="small tight">
@@ -3683,8 +3909,11 @@ function toRow(d){
   for (const [f, b] of Object.entries(BITS)) if (["legal","restricted"].includes(d.legalities?.[f])) flags += b;
   if ((/Legendary/.test(type) && /Creature/.test(type)) || /can be your commander/.test(d.oracle_text || front.oracle_text || "")) flags += 32;
   if (d.game_changer) flags += 64;
+  const L = d.legalities || {}, on = (d.games || []).includes("arena") || ["alchemy","historic","timeless","brawl","standardbrawl"].some(f => ["legal","restricted","banned"].includes(L[f]));
+  let af = 0; if (on) { af = A_ON; Object.entries({ standard:1, alchemy:2, historic:4, timeless:8, explorer:16, standardbrawl:32, brawl:64 }).forEach(([f, b]) => { if (["legal","restricted"].includes(L[f])) af += b; }); }
+  const rr = { common:"c", uncommon:"u", rare:"r", mythic:"m", special:"r", bonus:"m" }[d.rarity] || "c";
   return [d.name, d.mana_cost || front.mana_cost || "", d.cmc || 0, type, COLORS.filter(c => colors.includes(c)).join(""), COLORS.filter(c => ident.includes(c)).join(""), oracle, pt, flags,
-    +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0), +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0)];
+    +(d.prices?.usd || d.prices?.usd_foil || d.prices?.usd_etched || 0), +(d.prices?.usd_foil || d.prices?.usd_etched || d.prices?.usd || 0), af, rr];
 }
 function applyOverlay(){
   const ov = LS.get(OV_LS); if (!ov) return;
@@ -3705,7 +3934,7 @@ function reindex(){
   const dig = window.MTG_DB?.meta?.digital || [];
   S.digital = new Set(dig.map(norm));
 }
-const isDigital = n => !!S.digital?.has(norm(String(n).replace(/^A-/, "")));
+const isDigital = n => { if (S.digital?.has(norm(n)) || S.digital?.has(norm(String(n).replace(/^A-/, "")))) return true; const i = S.byName?.get(String(n).toLowerCase()); return i !== undefined && arenaOnly(S.cards[i]); };
 async function sfSearch(q, onPage, unique = "cards"){
   let url = "https://api.scryfall.com/cards/search?unique=" + unique + "&q=" + encodeURIComponent(q);
   const out = [];
@@ -3778,7 +4007,7 @@ function showTab(t){
   if (t !== "collection") stopScan();
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-function renderAll(){ renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); renderSync(); renderScanList(); if (!$("#tab-play").hidden) renderPlay(); }
+function renderAll(){ renderArena(); renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); renderSync(); renderScanList(); if (!$("#tab-play").hidden) renderPlay(); }
 
 (async function boot(){
   showTab(LS.get("dw.tab") || "collection");
