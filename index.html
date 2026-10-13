@@ -1020,12 +1020,12 @@ function makeArenaPool(o){
     const c = card(i);
     if (!legalIn(c, o.fmt) || (o.commander != null && i === o.commander) || isBasic(c)) return;
     if (allowed && ![...c[C.id]].every(x => allowed.includes(x))) return;
-    const own = Math.min(S.arena.get(i) || 0, capFor(c, o));
+    const own = Math.min(Math.max(S.arena.get(i) || 0, o.keep?.get(i) || 0), capFor(c, o));
     const canCraft = o.craft && (o.wild[rarOf(c)] || 0) > 0 && own < capFor(c, o);
     if (!own && !canCraft) return;
     list.push({ i, own, craft:canCraft, s: score(c, words) + (own ? 4 : 0) + (isLand(c) && c[C.id].length > 1 ? 2 : 0) });
   };
-  if (o.craft) { for (let i = 0; i < S.cards.length; i++) consider(i); } else for (const i of S.arena.keys()) consider(i);
+  if (o.craft) { for (let i = 0; i < S.cards.length; i++) consider(i); } else for (const i of new Set([...S.arena.keys(), ...(o.keep?.keys() || [])])) consider(i);
   // everything owned first, then the craftable cards that best match the theme
   list.sort((a,b) => (b.own > 0) - (a.own > 0) || b.s - a.s || card(a.i)[C.cmc] - card(b.i)[C.cmc]);
   const BUDGET = 110000; let used = 0; const lines = []; let cut = 0;
@@ -1143,8 +1143,9 @@ function validate(spec, o){
 }
 function validateArena(o, f, problems, merged, basics){
   const okCards = [], spent = { c:0, u:0, r:0, m:0 }, crafts = [];
+  o.wild = o.wild || { c:0, u:0, r:0, m:0 };
   for (const [i, v] of merged) {
-    const c = card(i), name = c[C.name], own = S.arena.get(i) || 0, rar = rarOf(c);
+    const c = card(i), name = c[C.name], own = Math.max(S.arena.get(i) || 0, o.keep?.get(i) || 0), rar = rarOf(c);
     if (o.commander === i) { problems.push(`${name} is the commander; don't list it in cards.`); continue; }
     if (isBasic(c)) { basics[name] = (basics[name]||0) + v.qty; continue; }
     if (!legalIn(c, o.fmt)) { problems.push(`${name}: not legal in ${f.label} on Arena.`); continue; }
@@ -1185,7 +1186,14 @@ const ERR = { not_granted:"Claude access was declined for this page. Reopen it a
   refused:"Claude declined that request. Try describing the deck differently.", empty_completion:"Claude returned nothing. Try again with a simpler request.",
   bad_key:"Anthropic rejected the API key. Check it in Settings.", no_credit:"Your Anthropic account is out of API credit. Add some at console.anthropic.com.",
   network:"Couldn't reach Claude. Check your internet connection.", overloaded:"Claude is busy right now. Try again in a minute." };
-const errText = e => ERR[e?.code] || "Something went wrong talking to Claude. Try again.";
+const errText = e => ERR[e?.code] || (e?.code === "_smallpool" ? smallPoolText(e.o) : e instanceof Error && e.message ? `Something went wrong: ${e.message}. Try again, and if it keeps happening, send a screenshot of this.` : "Something went wrong talking to Claude. Try again.");
+function smallPoolText(o){
+  if (o?.arena && !S.arena.size && !o.craft) return "Your Arena collection isn't imported yet, so there are no Arena cards to use. Import it on the Collection tab (Arena collection), or tick \"Let it craft\" to use any card on Arena.";
+  if (o?.arena && o.craft && !Object.values(o.wild || {}).some(v => v > 0)) return "It can't craft anything because your wildcards are set to 0. Enter how many you have on the Collection tab, under Arena collection.";
+  if (o?.arena && o.craft) return `Too few cards fit this deck's colours and ${FMT[o.fmt]?.label || "format"} within your wildcards.`;
+  if (o?.arena) return `Too few of your Arena cards fit this deck's colours and ${FMT[o.fmt]?.label || "format"}. Tick "Let it craft" to also use cards you'd craft.`;
+  return "Too few of your cards fit those choices to make a deck. Try other colours or another format.";
+}
 function stage(t){ $("#stage").textContent = t; }
 function busy(on){
   $("#progressPanel").hidden = !on; $("#buildBtn").disabled = on; $("#stream").textContent = "";
@@ -1212,7 +1220,7 @@ ${cands.map(p => { const c = card(p.i); return `${c[0]}|${c[1]}|${c[3]}|${c[6].s
 
 async function runDeckCall(o, extra){
   const pool = makePool(o);
-  if (pool.lines.length < 20) throw { code:"_smallpool" };
+  if (pool.lines.length < 20) throw { code:"_smallpool", o };
   o.useTools = S.toolsOK;
   const prompt = deckPrompt(o, pool, extra);
   let rounds = 0;
@@ -1289,7 +1297,7 @@ async function build(){
     else if (e?.code === "_cmdmissing") alertMsg("#buildMsg", `"${e.name}" isn't in your ${o.arena ? "Arena " : ""}collection${o.arena ? ` or isn't legal in ${FMT[o.fmt].label}` : ""}. Pick one from the suggestions or leave it blank.`);
     else if (e?.code === "_cmdwild") alertMsg("#buildMsg", `Crafting ${e.name} needs a ${RARNAME[e.rar]} wildcard, and none are left in your limit.`);
     else if (e?.code === "_notcmd") alertMsg("#buildMsg", `${e.name} can't be a commander. It needs to be a legendary creature or say it can be your commander.`);
-    else if (e?.code === "_smallpool") alertMsg("#buildMsg", "Too few of your cards fit those choices to make a deck. Try other colours or another format.");
+    else if (e?.code === "_smallpool") alertMsg("#buildMsg", smallPoolText(o));
     else alertMsg("#buildMsg", errText(e), "bad");
   } finally { busy(false); }
 }
@@ -1298,6 +1306,10 @@ $("#buildBtn").onclick = build;
 async function tweak(request){
   const d = S.current; if (!d || !S.sample) return;
   const o = { ...d.opts, excludeId:d.id, commander: d.commander ? lookup(d.commander) : null, identity: d.commander ? d.identity : (d.opts.colors || undefined) };
+  if (d.arena) { o.arena = true; o.basicsUnlimited = true; o.freeOnly = false; o.craft = !!$("#tweakCraft")?.checked; o.wild = o.craft ? { ...S.arenaWild } : { c:0, u:0, r:0, m:0 };
+    // cards already in the deck count as available, even if the Arena collection is missing or out of date
+    o.keep = new Map(deckEntries(d).map(([n, q]) => [lookup(n), q]).filter(([i]) => i >= 0)); }
+  if (d.arena && !S.arena.size && !o.craft) { const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice warn">${esc(smallPoolText(o))}</div>`; return; }
   const list = [...(d.commander ? [`COMMANDER: ${d.commander}`] : []), ...d.cards.map(c => `${c.qty} ${c.name}`), ...Object.entries(d.basics).map(([n,q]) => `${q} ${n} (basic)`)].join("\n");
   const extra = `- This is a revision. CURRENT DECK:\n${list}\n- CHANGE REQUESTED: ${request}\n- Keep what works; change only what the request needs, and keep the deck at full size.`;
   S.ctl = new AbortController(); busy(true);
@@ -1308,7 +1320,7 @@ async function tweak(request){
     nd.saved = false; nd.built = !!d.built; nd.versions = d.versions; nd.pulled = d.pulled; nd._note = "Claude: " + request; S.current = nd; renderDeck();
     if (d.saved) await saveDeck(nd);
   } catch (e) {
-    if (e?.code !== "cancelled") { const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
+    if (e?.code !== "cancelled") { console.warn(e); const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
   } finally { busy(false); }
 }
 
@@ -1373,6 +1385,7 @@ function renderDeck(){
     <h3 data-claude>Change something</h3>
     <div class="chips">${["More removal","Lower the curve","More card draw","Tighten the mana base","Make it stronger"].map(t => `<button class="chip" data-tweak="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="row"><input type="text" id="tweakInput" class="grow" placeholder="Swap the artifacts for more dragons" style="flex:1"><button id="tweakBtn" data-tweak="" data-claude>Ask</button></div>
+    ${d.arena ? `<label class="row small"><input type="checkbox" id="tweakCraft"${d.opts?.craft ? " checked" : ""}> Let it craft cards I don't own (up to my wildcards)</label>` : ""}
     <div id="tweakMsg"></div>
   </div>
   ${d.arena ? "" : `<div class="panel">
