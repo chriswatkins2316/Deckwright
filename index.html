@@ -1735,9 +1735,12 @@ function arenaNeedHTML(d, compact){
 }
 function arenaText(d){
   const lines = [];
-  if (d.commander) lines.push("Commander", `1 ${d.commander}`, "");
+  // Arena, like Forge, names two-sided cards by their front face; only split cards and Rooms keep both halves
+  if (d.commander) lines.push("Commander", `1 ${forgeName(d.commander)}`, "");
   lines.push("Deck");
-  for (const c of d.cards) lines.push(`${c.qty} ${c.name}`);
+  const merged = new Map();
+  for (const c of d.cards) { const n = forgeName(c.name); merged.set(n, (merged.get(n) || 0) + c.qty); }
+  for (const [n, q] of merged) lines.push(`${q} ${n}`);
   for (const [n, q] of Object.entries(d.basics || {})) lines.push(`${q} ${n}`);
   return lines.join("\n");
 }
