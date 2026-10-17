@@ -439,6 +439,11 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div id="buildMsg"></div>
       <div id="bestCmdOut"></div>
     </div>
+    <div class="panel" id="recentPanel" hidden>
+      <h2>Recent builds</h2>
+      <p class="small muted">Your last 5 builds that aren't saved yet, kept on this device in case the app closes. Saving one moves it to Decks.</p>
+      <div id="recentList"></div>
+    </div>
     <div class="panel" id="progressPanel" hidden>
       <div class="progress"><div class="spin"></div><div class="grow"><b id="stage">Starting</b><div class="stream" id="stream"></div></div><button class="ghost" id="stopBtn">Stop</button></div>
     </div>
@@ -829,13 +834,37 @@ async function syncFromServer(){
     renderAll();
   } catch (e) { console.warn("sync failed", e); }
 }
+/* ---------- recent builds: the last 5 unsaved decks, so closing the app doesn't lose them ---------- */
+const RECENT_MAX = 5;
+function recentList(){ const saved = new Set((S.decks || []).map(d => d.id)); return (LS.get("dw.recent") || []).filter(d => d && !saved.has(d.id)); }
+function recentPut(d, replaceId){
+  if (!d || d.saved) return;
+  const list = recentList().filter(x => x.id !== d.id && x.id !== replaceId);
+  LS.set("dw.recent", [JSON.parse(JSON.stringify(d)), ...list].slice(0, RECENT_MAX));
+  renderRecent();
+}
+function recentDrop(id){ LS.set("dw.recent", recentList().filter(x => x.id !== id)); renderRecent(); }
+function renderRecent(){
+  const panel = $("#recentPanel"); if (!panel) return;
+  const list = recentList();
+  panel.hidden = !list.length;
+  $("#recentList").innerHTML = list.map(d => { const f = FMT[d.format] || FMT.casual;
+    return `<div class="saved"><button class="open" data-ro="${d.id}">${esc(d.name)}</button><span class="count num ${sizeOk(d.total, d.format) ? "ok" : "short"}">${d.total}/${f.size}</span>
+      <span class="small muted">${d.arena ? `<span class="atag">Arena</span> ` : ""}${esc(f.label)}${d.commander ? " · " + esc(d.commander) : ""} · ${new Date(d.createdAt).toLocaleString([], { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}</span>
+      <span class="row" style="justify-content:flex-end;gap:6px;flex-wrap:nowrap"><button class="mini" data-rs="${d.id}">Save</button><button class="ghost mini" data-rx="${d.id}" aria-label="Remove ${esc(d.name)} from recent builds">✕</button></span></div>`; }).join("");
+  const find = id => recentList().find(x => x.id === id);
+  panel.querySelectorAll("[data-ro]").forEach(b => b.onclick = () => { const d = find(b.dataset.ro); if (!d) return; S.current = d; renderDeck(); $("#deckView").scrollIntoView({ behavior:"smooth" }); });
+  panel.querySelectorAll("[data-rs]").forEach(b => b.onclick = async () => { const d = find(b.dataset.rs); if (!d) return; await saveDeck(d); if (S.current?.id === d.id) { S.current = d; renderDeck(); } b.closest(".saved")?.remove(); renderRecent(); });
+  panel.querySelectorAll("[data-rx]").forEach(b => b.onclick = () => recentDrop(b.dataset.rx));
+}
+
 async function saveDeck(d){
   d.saved = true;
   recordVersion(d);
   S.decks = [d, ...S.decks.filter(x => x.id !== d.id)];
   LS.set("dw.decks", S.decks);
   if (S.db && S.uid) { try { await S.db.doc(`data/users/${S.uid}/deck-${d.id}`).set({ kind:"deck", deck:d }); } catch(e){ console.warn(e); } }
-  renderSaved();
+  renderSaved(); recentDrop(d.id);
 }
 async function deleteDeck(id){
   S.decks = S.decks.filter(x => x.id !== id); LS.set("dw.decks", S.decks);
@@ -1290,6 +1319,7 @@ async function build(){
     }
     const res = await runDeckCall(o);
     S.current = toDeck(o, res);
+    recentPut(S.current);
     renderDeck();
   } catch (e) {
     if (e?.code === "cancelled") alertMsg("#buildMsg", "Stopped.", "ok");
@@ -1318,6 +1348,7 @@ async function tweak(request){
     const res = await runDeckCall(o, extra);
     const nd = toDeck(o, res, d.saved ? d.id : null);
     nd.saved = false; nd.built = !!d.built; nd.versions = d.versions; nd.pulled = d.pulled; nd._note = "Claude: " + request; S.current = nd; renderDeck();
+    if (!d.saved) recentPut(nd, d.id);
     if (d.saved) await saveDeck(nd);
   } catch (e) {
     if (e?.code !== "cancelled") { console.warn(e); const m = $("#tweakMsg"); if (m) m.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
@@ -2404,7 +2435,7 @@ function renderDeckEval(d){
     d.cards = d.cards.filter(c => c.qty > 0);
     d.total = d.cards.reduce((a, c) => a + c.qty, 0) + Object.values(d.basics || {}).reduce((a, q) => a + q, 0) + (d.commander ? 1 : 0);
     d._note = `Claude's swaps (${picks.length})`;
-    S.current = d; if (d.saved) await saveDeck(d);
+    S.current = d; if (d.saved) await saveDeck(d); else recentPut(d);
     renderDeck();
     $("#deckEvalMsg") && ($("#deckEvalMsg").innerHTML = `<div class="notice ok">Swapped ${picks.length} card${picks.length === 1 ? "" : "s"}.${d.arena ? " Copy it for Arena again to update the deck there." : d.built ? " Pull the new cards from your collection and put the old ones away." : ""}</div>`);
   };
@@ -4130,7 +4161,7 @@ function showTab(t){
   if (t !== "collection") stopScan();
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-function renderAll(){ renderArena(); renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); renderSync(); renderScanList(); if (!$("#tab-play").hidden) renderPlay(); }
+function renderAll(){ renderRecent(); renderArena(); renderCollection(); renderBuildForm(); renderSaved(); renderDeck(); renderSettings(); renderSync(); renderScanList(); if (!$("#tab-play").hidden) renderPlay(); }
 
 (async function boot(){
   showTab(LS.get("dw.tab") || "collection");
