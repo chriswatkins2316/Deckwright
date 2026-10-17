@@ -717,6 +717,15 @@ function readImport(text){
     const fi = col("foil","printing","finish","foil/variant","is foil","variant"), idi = col("scryfall id","scryfall_id","scryfallid","scryfall uuid");
     const bi = head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) >= 0 ? head.findIndex(h => /binder|list|deck|folder/.test(h) && /name/.test(h)) : col("binder","list","deck","folder");
     const bti = head.findIndex(h => /binder|list|deck|folder/.test(h) && /type/.test(h));
+    // Some Arena exports have a row per printing, with "Count" = copies of the card overall (repeated on every row)
+    // and "PrintCount" = copies of that printing. Count each card once, by its highest Count.
+    const pci = col("printcount","print count","print_count","printing count");
+    if (pci >= 0 && qi >= 0) {
+      const best = new Map();
+      for (const r of rows) { const n = String(r[ni] || "").trim(), q = parseInt(r[qi], 10) || 0; if (n && q > (best.get(n) || 0)) best.set(n, q); }
+      for (const [n, q] of best) add(n, q, null);
+      return { out, unmatched, lines, prints, binders, unmatchedRows, perCard:true };
+    }
     for (const r of rows) {
       const f = fi >= 0 ? String(r[fi] || "").trim().toLowerCase() : "";
       const finish = /etched/.test(f) ? "etched" : (/^(foil|true|yes|y|1)$/.test(f) || (/\bfoil\b/.test(f) && !/non-?foil|normal/.test(f))) ? "foil" : "normal";
@@ -1409,7 +1418,7 @@ function renderDeck(){
       const rows = (groups[g] || []).sort((a,b) => card(a.i)[C.cmc] - card(b.i)[C.cmc] || a.name.localeCompare(b.name));
       const n = rows.reduce((a,b)=>a+b.qty,0) + (g === "Lands" ? basicsTotal : 0);
       const basicRows = g === "Lands" ? Object.entries(d.basics).map(([nm,q]) => { const i = lookup(nm); return i >= 0 ? cardRow(i, q, "basic") : ""; }).join("") : "";
-      return `<div class="group"><h3>${g}<span class="num muted">${n}</span></h3><div class="list">${rows.map(e => cardRow(e.i, e.qty, e.role)).join("")}${basicRows}</div></div>`;
+      return `<div class="group"><h3>${g}<span class="num muted">${n}</span></h3><div class="list">${rows.map(e => cardRow(e.i, e.qty, d.arena && S.arena.size && e.qty > (S.arena.get(e.i) || 0) ? `${e.role ? e.role + " · " : ""}craft ${e.qty - (S.arena.get(e.i) || 0)}, own ${S.arena.get(e.i) || 0}` : e.role)).join("")}${basicRows}</div></div>`;
     }).join("")}
   </div>
   <div class="panel">
