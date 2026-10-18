@@ -3601,7 +3601,10 @@ function forgeLists(o){
 }
 function forgeDck(o){
   const { cmd, main } = forgeLists(o);
-  return `[metadata]\nName=${o.name.replace(/[\r\n]/g, " ")}\n${cmd.length ? `[Commander]\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n` : ""}[Main]\n${main.map(([n, q]) => `${q} ${n}`).join("\n")}\n[Sideboard]\n`;
+  // Deck Type puts it in the right kind of game; the Format tag lets Forgewright show the format it was built for
+  const kind = forgeKind(o), label = o.format && o.format !== "casual" && FMT[o.format] ? FMT[o.format].label.replace(/[,\r\n]/g, " ") : "";
+  const meta = (kind === "commander" ? "Deck Type=Commander\n" : kind === "brawl" ? "Deck Type=Brawl\n" : "") + (label ? `Tags=Format:${label}\nComment=Built in Deckwright for ${label}\n` : "");
+  return `[metadata]\nName=${o.name.replace(/[\r\n]/g, " ")}\n${meta}${cmd.length ? `[Commander]\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n` : ""}[Main]\n${main.map(([n, q]) => `${q} ${n}`).join("\n")}\n[Sideboard]\n`;
 }
 function forgePaste(o){
   const { cmd, main } = forgeLists(o);
