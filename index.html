@@ -1442,7 +1442,7 @@ function renderDeck(){
   </div>`}
   <div class="panel">
     <h3>Share</h3>
-    <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button><button id="forgeBtn">Play it in Forge</button></div>
+    <div class="row btnrow"><button id="shareBtn">Share link and QR code</button><button id="archBtn">Copy for Archidekt</button><button id="forgeBtn">${inForgewright() ? "Send to Forge" : "Play it in Forge"}</button></div>
     <div id="shareOut"></div>
   </div>
   ${d.arena ? "" : `<div class="panel">
@@ -1590,7 +1590,7 @@ function renderCheck(){
       <button class="grow" id="manaCheckBtn">Mana base</button>
       <button class="grow" id="bracketCheckBtn">${k.fmt === "commander" ? "Bracket and combos" : "Find combos"}</button>
       <button class="grow" id="saveCheckBtn">Save as deck</button>
-      <button class="grow" id="forgeCheckBtn">Play it in Forge</button>
+      <button class="grow" id="forgeCheckBtn">${inForgewright() ? "Send to Forge" : "Play it in Forge"}</button>
       <button class="grow" id="proxyCheckBtn">Print proxies</button>
       <button class="primary grow" id="evalBtn" data-claude>${ev ? "Evaluate again" : "Evaluate with Claude"}</button>
     </div>
@@ -3539,6 +3539,7 @@ function proxyPanel(box, entries){
   draw();
 }
 async function printProxies(list, backs, msg){
+  if (inForgewright()) { msg.innerHTML = `<div class="notice warn">Printing doesn't work inside Forgewright. Open Deckwright in your phone's browser to print proxies (sync keeps your decks the same).</div>`; return; }
   const faces = [];
   for (const [n, q] of list) for (let k = 0; k < q; k++) { faces.push(pxImg(n, false)); if (backs && isTwoSided(n)) faces.push(pxImg(n, true)); }
   document.getElementById("proxyPrint")?.remove();
@@ -3578,7 +3579,15 @@ function forgePaste(o){
   const { cmd, main } = forgeLists(o);
   return `${cmd.length ? `Commander\n${cmd.map(([n, q]) => `${q} ${n}`).join("\n")}\n\nMain\n` : ""}${main.map(([n, q]) => `${q} ${n}`).join("\n")}`;
 }
+// Inside the Forgewright app (Forge with Deckwright built in) decks go straight to Forge
+const inForgewright = () => !!(window.Forgewright && typeof window.Forgewright.importDeck === "function");
+function forgeKind(o){ return o.format === "standardbrawl" ? "brawl" : (o.format === "commander" || o.format === "brawl" || o.commanders.length) ? "commander" : "constructed"; }
 function forgePanel(box, o){
+  if (inForgewright()) {
+    try { window.Forgewright.importDeck(o.name || "Deckwright deck", forgeDck(o), forgeKind(o)); box.innerHTML = `<div class="notice ok" style="margin-top:8px">Sent to Forge. Find it in Deck Manager.</div>`; }
+    catch (e) { box.innerHTML = `<div class="notice bad" style="margin-top:8px">Couldn't send it to Forge: ${esc(e?.message || e)}</div>`; }
+    return;
+  }
   const isCmd = isCmdFmt(o.format) || o.commanders.length;
   box.innerHTML = `<div class="notice" style="margin-top:8px"><b>Play this deck against the computer in Forge</b>
     <p class="small">Forge is a free Magic program with the full rules and an AI opponent. It runs on Android and PC. Get it from <a href="https://github.com/Card-Forge/forge/releases" target="_blank" rel="noopener">Forge's releases page</a>.</p>
