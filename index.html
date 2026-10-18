@@ -3142,8 +3142,9 @@ function syncConflict(remote, c){
 function renderSync(msg, bad){
   const box = $("#syncState"); if (!box) return;
   const c = syncCfg();
-  box.innerHTML = c.token ? `<div class="notice ${bad ? "bad" : "ok"}">${esc(msg || (c.lastSync ? `Sync is on. Last synced ${new Date(c.lastSync).toLocaleString()}.` : "Sync is on."))}</div>` : `<div class="notice">Sync is off. Without it, use Backup to move your data.</div>`;
+  box.innerHTML = c.token ? `<div class="notice ${bad ? "bad" : "ok"}">${esc(msg || (c.lastSync ? `Sync is on. Last synced ${new Date(c.lastSync).toLocaleString()}.` : "Sync is on."))}${secretRow("syncSecret")}</div>` : `<div class="notice">Sync is off. Without it, use Backup to move your data.</div>`;
   $("#syncNowBtn").hidden = $("#syncOff").hidden = !c.token;
+  if (c.token) bindSecret("syncSecret", c.token);
 }
 $("#ghShow").onclick = () => { const i = $("#ghToken"); i.type = i.type === "password" ? "text" : "password"; $("#ghShow").textContent = i.type === "password" ? "Show" : "Hide"; };
 $("#syncSetup").onclick = async () => {
@@ -3162,6 +3163,19 @@ $("#syncNowBtn").onclick = () => syncNow(false);
 $("#syncOff").onclick = () => { const b = $("#syncOff"); if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to turn off"; setTimeout(() => { if (b.isConnected) { delete b.dataset.c; b.textContent = "Turn off"; } }, 3000); return; }
   saveSyncCfg({}); delete b.dataset.c; b.textContent = "Turn off"; $("#syncMsg").innerHTML = `<div class="notice ok">Sync turned off on this device. Your data stays here and in the Gist.</div>`; renderSync(); };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.cards.length) syncNow(true); });
+
+/* ---------- saved key and token: show or copy them, e.g. to set up another device or Forgewright ---------- */
+const maskSecret = v => v ? v.slice(0, 7) + "•".repeat(10) + v.slice(-4) : "";
+function secretRow(id){
+  return `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:nowrap;align-items:center"><code id="${id}V" class="small" style="flex:1;min-width:0;overflow-wrap:anywhere"></code>
+    <button class="mini ghost" id="${id}S" type="button">Show</button><button class="mini" id="${id}C" type="button">Copy</button></div><div id="${id}F"></div>`;
+}
+function bindSecret(id, value){
+  const v = $("#" + id + "V"); if (!v) return;
+  v.textContent = maskSecret(value);
+  $("#" + id + "S").onclick = e => { const shown = e.target.textContent === "Hide"; v.textContent = shown ? maskSecret(value) : value; e.target.textContent = shown ? "Show" : "Hide"; };
+  $("#" + id + "C").onclick = e => copyText(value, e.target, $("#" + id + "F"));
+}
 
 /* ---------- shared helpers ---------- */
 function copyText(t, btn, fallbackBox){
@@ -3935,8 +3949,9 @@ function showKeyNeeded(sel){
 function renderSettings(){
   const k = getKey();
   $("#keyState").innerHTML = k
-    ? `<div class="notice ok">Key saved on this device (ends in …${esc(k.slice(-4))}).</div>`
+    ? `<div class="notice ok">Key saved on this device (ends in …${esc(k.slice(-4))}).${secretRow("keySecret")}</div>`
     : `<div class="notice warn">No key yet. Your collection, prices, the Check tab, card lookup, combos and test draws all work without one, and card scanning falls back to your phone's own text reading. Buttons marked ✦ use Claude and show <b>Needs key</b> until you add one.</div>`;
+  if (k) bindSecret("keySecret", k);
   const m = window.MTG_DB?.meta || {};
   if ($("#comboDataInfo")) $("#comboDataInfo").textContent = COMBOS ? `${COMBOS.c.length.toLocaleString()} combos from Commander Spellbook${COMBOS.t ? ", updated " + String(COMBOS.t).slice(0, 10) : ""}.` : combosTried ? "No combo data yet. Run the GitHub job below once." : "";
   $("#cardDataInfo").textContent = S.cards.length
