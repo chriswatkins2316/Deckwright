@@ -1,5 +1,5 @@
 // Deckwright offline support. Bump VERSION whenever any app file changes.
-const VERSION = "deckwright-v33";
+const VERSION = "deckwright-v34";
 const FONTS = "deckwright-fonts";
 const LIBS = "deckwright-libs";   // the on-device card reader, downloaded on first use
 const SHELL = ["./", "index.html", "cards.js", "manifest.webmanifest",

@@ -190,6 +190,8 @@ button.mini{min-height:32px;padding:2px 10px}
 .cpill{font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:var(--bg)}
 .cpill.own{border-color:var(--ok)}
 .cpill.miss{border-color:var(--bad);border-style:dashed}
+button.cpill{font:500 .8rem var(--body);color:var(--fg);min-height:32px;padding:3px 11px;border-radius:999px;cursor:pointer}
+button.cpill[aria-expanded="true"]{background:var(--sunk);box-shadow:inset 0 0 0 1px var(--accent)}
 .bracket{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .bracket .bignum{color:var(--accent)}
 .setrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer;width:100%}
@@ -978,21 +980,24 @@ function cmpImg(name){
   return `https://api.scryfall.com/cards/named?format=image&version=normal&exact=${encodeURIComponent(n)}`;
 }
 // cards: [{ name, tag:"out"|"in"|"", label }]
-function compareView(cards, why){
+function compareView(cards, why, opt = {}){
   const wrap = document.createElement("div"); wrap.className = "gallery cmpview";
   wrap.innerHTML = `<div class="gtrack" tabindex="0" aria-label="${cards.length > 1 ? "Swipe to compare the cards" : esc(cards[0].name)}">${cards.map(x => `<figure class="gslide">
       ${x.label ? `<span class="cmptag ${x.tag}">${esc(x.label)}</span>` : ""}
       <img class="cardimg" loading="lazy" alt="${esc(x.name)}" src="${cmpImg(x.name)}">
       ${localFaceHTML(x.name)}</figure>`).join("")}</div>
-    ${cards.length > 1 ? `<div class="gnav"><button class="ghost mini" data-g="-1" aria-label="Previous card">‹</button><span class="cmpdots">${cards.map((_, k) => `<span${k ? "" : ` class="on"`}></span>`).join("")}</span><span class="small muted gcount">Swipe for the new card</span><button class="ghost mini" data-g="1" aria-label="Next card">›</button></div>` : ""}
+    ${cards.length > 1 ? `<div class="gnav"><button class="ghost mini" data-g="-1" aria-label="Previous card">‹</button><span class="cmpdots">${cards.map((_, k) => `<span${k === (opt.start || 0) ? ` class="on"` : ""}></span>`).join("")}</span><span class="small muted gcount">${opt.counter ? `${(opt.start || 0) + 1} of ${cards.length}` : "Swipe for the new card"}</span><button class="ghost mini" data-g="1" aria-label="Next card">›</button></div>` : ""}
     ${why ? `<p class="small muted cmpwhy">${esc(why)}</p>` : ""}`;
   const track = wrap.querySelector(".gtrack"), dots = [...wrap.querySelectorAll(".cmpdots span")], count = wrap.querySelector(".gcount");
   const go = dir => track.scrollBy({ left:dir * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   track.addEventListener("scroll", () => requestAnimationFrame(() => {
     const k = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
     dots.forEach((d, j) => d.classList.toggle("on", j === k));
-    if (count) count.textContent = k ? "Swipe back for the old card" : "Swipe for the new card";
+    if (count) count.textContent = opt.counter ? `${k + 1} of ${cards.length}` : k ? "Swipe back for the old card" : "Swipe for the new card";
+    wrap.dispatchEvent(new CustomEvent("slide", { detail:k }));
   }), { passive:true });
+  wrap.goTo = (k, smooth) => track.scrollTo({ left:k * track.clientWidth, behavior:smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto" });
+  if (opt.start) requestAnimationFrame(() => wrap.goTo(opt.start, false));
   wrap.querySelectorAll("[data-g]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); go(+b.dataset.g); });
   track.addEventListener("keydown", e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); go(e.key === "ArrowRight" ? 1 : -1); } });
   wrap.addEventListener("click", e => { if (e.target.closest("label")) e.preventDefault(); });
@@ -1014,6 +1019,22 @@ document.addEventListener("click", e => {
   if (inside) row.appendChild(view); else row.after(view);
   b.setAttribute("aria-expanded", "true"); b.textContent = "Hide";
 }, true);
+// Combos: tap a card name to see every piece of the combo, starting with that card
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-cmb]"); if (!b) return;
+  e.preventDefault();
+  const box = b.closest(".combo") || b.parentElement, pills = b.closest(".cpills") || b.parentElement;
+  const names = b.dataset.cmbAll.split("|").filter(Boolean), have = new Set((b.dataset.cmbHave || "").split("|")), k = Math.max(0, names.indexOf(b.dataset.cmb));
+  const chips = [...box.querySelectorAll("[data-cmb]")], open = box.querySelector(":scope > .cmpview");
+  const mark = j => chips.forEach(c => c.setAttribute("aria-expanded", String(names.indexOf(c.dataset.cmb) === j)));
+  if (open) {
+    if (b.getAttribute("aria-expanded") === "true") { open.remove(); mark(-1); return; }   // same card again: close
+    open.goTo(k, true); mark(k); return;                                                    // another card: swipe to it
+  }
+  const view = compareView(names.map(n => ({ name:n, tag:have.has(n) ? "in" : "out", label:have.has(n) ? "You have it" : "You need it" })), "", { counter:true, start:k });
+  view.addEventListener("slide", ev => mark(ev.detail));
+  pills.after(view); mark(k);
+});
 function bindCardRows(root){
   root.querySelectorAll("button.n").forEach(b => b.onclick = () => {
     const row = b.parentElement, open = row.querySelector(".detail");
@@ -3318,7 +3339,7 @@ function comboHTML(v, inList){
   const prod = (v.produces || []).map(p => p.feature?.name).filter(Boolean).slice(0, 3).join(" · ");
   return `<div class="combo">
     <div class="cpills">${cards.map(n => { const have = inList(n), i = lookup(n);
-      return `<span class="cpill ${have ? "own" : "miss"}">${esc(n)}${have ? "" : ` · need${i >= 0 ? " " + money(buyPrice(i)) : ""}`}</span>`; }).join("")}${extra.map(t => `<span class="cpill">+ ${esc(t)}</span>`).join("")}</div>
+      return `<button type="button" class="cpill ${have ? "own" : "miss"}" data-cmb="${esc(n)}" data-cmb-all="${esc(cards.join("|"))}" data-cmb-have="${esc(cards.filter(n => inList(n)).join("|"))}" aria-expanded="false">${esc(n)}${have ? "" : ` · need${i >= 0 ? " " + money(buyPrice(i)) : ""}`}</button>`; }).join("")}${extra.map(t => `<span class="cpill">+ ${esc(t)}</span>`).join("")}</div>
     ${prod ? `<span class="small">${esc(prod)}</span>` : ""}
     <details><summary class="small">How it works${v.description ? "" : " (steps on Commander Spellbook)"}</summary>
       ${v.easyPrerequisites ? `<p class="small muted" style="white-space:pre-wrap">${esc(v.easyPrerequisites)}</p>` : ""}
@@ -3387,7 +3408,7 @@ DECKLIST:
 ${all.map(([n, q]) => `${q} ${n}`).join("\n")}`, { modelTier:"default", cache:false });
     const inDeck = new Set(all.map(([n]) => lookup(n)));
     const list = (r?.combos || []).filter(c => Array.isArray(c.cards) && c.cards.length && c.cards.every(n => inDeck.has(lookup(n))));
-    out.innerHTML = list.length ? list.map(c => `<div class="combo"><div class="cpills">${c.cards.map(n => `<span class="cpill own">${esc(card(lookup(n))[C.name])}</span>`).join("")}</div><span class="small">${esc(c.result || "")}</span></div>`).join("") + `<p class="small muted">From Claude, so double-check before relying on it.</p>`
+    out.innerHTML = list.length ? list.map(c => `<div class="combo"><div class="cpills">${c.cards.map(n => { const all = c.cards.map(x => card(lookup(x))[C.name]).join("|"); return `<button type="button" class="cpill own" data-cmb="${esc(card(lookup(n))[C.name])}" data-cmb-all="${esc(all)}" data-cmb-have="${esc(all)}" aria-expanded="false">${esc(card(lookup(n))[C.name])}</button>`; }).join("")}</div><span class="small">${esc(c.result || "")}</span></div>`).join("") + `<p class="small muted">From Claude, so double-check before relying on it.</p>`
       : `<p class="small muted">Claude didn't find any combos in this list.</p>`;
   } catch (e) { out.innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`; }
 }
