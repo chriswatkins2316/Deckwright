@@ -214,6 +214,16 @@ button.mini{min-height:32px;padding:2px 10px}
 .gslide figcaption{text-align:center;padding:0 8px}
 .cardimg.foil{box-shadow:0 0 0 2px var(--accent),0 0 14px -2px var(--accent)}
 .gnav{display:flex;justify-content:center;align-items:center;gap:12px}
+.cmpbtn{flex:none;font-size:.75rem;padding:2px 8px;min-height:28px;margin-left:6px;vertical-align:middle}
+.cmpview{grid-column:1/-1;background:var(--sunk);border-radius:8px;padding:8px 6px;margin:6px 0 2px}
+.cmpview .gslide{justify-content:flex-start}
+.cmptag{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 10px;border-radius:999px}
+.cmptag.out{color:var(--bad);border:1px solid var(--bad)}
+.cmptag.in{color:var(--ok);border:1px solid var(--ok)}
+.cmpview .lface{width:100%;max-width:360px;font-size:.85rem;text-align:left;padding:0 6px}
+.cmpview .cardimg{width:min(230px,78%)}
+.cmpwhy{text-align:center;margin:6px 8px 0}
+.cmpdots{display:flex;gap:6px}.cmpdots span{width:7px;height:7px;border-radius:50%;background:var(--line)}.cmpdots span.on{background:var(--accent)}
 .gnav button{min-width:44px;font-size:1.2rem}
 .scanvideo{width:100%;max-height:60vh;border-radius:var(--r);background:#000;display:block;object-fit:cover}
 [data-claude]::after{content:"✦";margin-left:.4em;font-weight:400;opacity:.75}
@@ -957,6 +967,53 @@ function cardGallery(c){
   wrap.querySelectorAll("img").forEach(img => img.onerror = () => { if (slides.length === 1 && !prints.length) wrap.remove(); else img.style.visibility = "hidden"; });
   return wrap;
 }
+/* ---------- swap suggestions: see the card going out, swipe to the card coming in ---------- */
+function localFaceHTML(name){
+  const i = lookup(name); if (i < 0) return `<div class="lface"><p><b>${esc(name)}</b></p></div>`;
+  const c = card(i), pt = /\//.test(c[C.pt] || "") ? c[C.pt].split("/") : null;
+  return faceHTML({ name:c[C.name], mana_cost:c[C.cost], type_line:c[C.type], oracle_text:c[C.text], power:pt ? pt[0] : null, toughness:pt ? pt[1] : null, loyalty:!pt && c[C.pt] ? c[C.pt] : "" });
+}
+function cmpImg(name){
+  const i = lookup(name), n = (i >= 0 ? card(i)[C.name] : name).split(" // ")[0];
+  return `https://api.scryfall.com/cards/named?format=image&version=normal&exact=${encodeURIComponent(n)}`;
+}
+// cards: [{ name, tag:"out"|"in"|"", label }]
+function compareView(cards, why){
+  const wrap = document.createElement("div"); wrap.className = "gallery cmpview";
+  wrap.innerHTML = `<div class="gtrack" tabindex="0" aria-label="${cards.length > 1 ? "Swipe to compare the cards" : esc(cards[0].name)}">${cards.map(x => `<figure class="gslide">
+      ${x.label ? `<span class="cmptag ${x.tag}">${esc(x.label)}</span>` : ""}
+      <img class="cardimg" loading="lazy" alt="${esc(x.name)}" src="${cmpImg(x.name)}">
+      ${localFaceHTML(x.name)}</figure>`).join("")}</div>
+    ${cards.length > 1 ? `<div class="gnav"><button class="ghost mini" data-g="-1" aria-label="Previous card">‹</button><span class="cmpdots">${cards.map((_, k) => `<span${k ? "" : ` class="on"`}></span>`).join("")}</span><span class="small muted gcount">Swipe for the new card</span><button class="ghost mini" data-g="1" aria-label="Next card">›</button></div>` : ""}
+    ${why ? `<p class="small muted cmpwhy">${esc(why)}</p>` : ""}`;
+  const track = wrap.querySelector(".gtrack"), dots = [...wrap.querySelectorAll(".cmpdots span")], count = wrap.querySelector(".gcount");
+  const go = dir => track.scrollBy({ left:dir * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  track.addEventListener("scroll", () => requestAnimationFrame(() => {
+    const k = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    dots.forEach((d, j) => d.classList.toggle("on", j === k));
+    if (count) count.textContent = k ? "Swipe back for the old card" : "Swipe for the new card";
+  }), { passive:true });
+  wrap.querySelectorAll("[data-g]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); go(+b.dataset.g); });
+  track.addEventListener("keydown", e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); go(e.key === "ArrowRight" ? 1 : -1); } });
+  wrap.addEventListener("click", e => { if (e.target.closest("label")) e.preventDefault(); });
+  wrap.querySelectorAll("img").forEach(img => img.onerror = () => { img.style.display = "none"; });
+  return wrap;
+}
+const cmpBtn = (outName, inName, why, text = "Cards") =>
+  `<button type="button" class="ghost mini cmpbtn" data-cmp-out="${esc(outName || "")}" data-cmp-in="${esc(inName || "")}" data-cmp-why="${esc(why || "")}" aria-expanded="false" data-cmp-text="${text}">${text}</button>`;
+// One listener for every "Cards" button, wherever suggestions are shown
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-cmp-out]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const row = b.closest(".pullrow, .sub, li") || b.parentElement, inside = row.tagName === "LI";
+  const open = inside ? row.querySelector(":scope > .cmpview") : (row.nextElementSibling?.classList.contains("cmpview") ? row.nextElementSibling : null);
+  if (open) { open.remove(); b.setAttribute("aria-expanded", "false"); b.textContent = b.dataset.cmpText || "Cards"; return; }
+  const o = b.dataset.cmpOut, n = b.dataset.cmpIn;
+  const cards = o && n ? [{ name:o, tag:"out", label:"Take out" }, { name:n, tag:"in", label:"Put in" }] : [{ name:o || n, tag:"", label:"" }];
+  const view = compareView(cards, row.tagName === "LI" ? b.dataset.cmpWhy : "");   // swap rows already show the reason
+  if (inside) row.appendChild(view); else row.after(view);
+  b.setAttribute("aria-expanded", "true"); b.textContent = "Hide";
+}, true);
 function bindCardRows(root){
   root.querySelectorAll("button.n").forEach(b => b.onclick = () => {
     const row = b.parentElement, open = row.querySelector(".detail");
@@ -1645,8 +1702,8 @@ function evalHTML(ev){
     <p>${esc(ev.verdict)}</p>
     ${ev.strengths.length ? `<div><span class="label">Strengths</span><ul class="tight">${ev.strengths.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
     ${ev.weaknesses.length ? `<div><span class="label">Weaknesses</span><ul class="tight">${ev.weaknesses.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
-    ${ev.subs.length ? `<div><span class="label">Stand-ins from your collection</span><div class="list">${ev.subs.map(s => `<div class="sub"><span class="swap"><span class="need">${esc(s.missing)}</span> → ${s.replacement ? `<span class="have">${esc(s.replacement)}</span>` : `<span class="muted">nothing close in your collection</span>`}</span>${s.why ? `<span class="small muted">${esc(s.why)}</span>` : ""}</div>`).join("")}</div></div>` : ""}
-    ${ev.buys.length ? `<div><span class="label">Worth buying first</span><ul class="tight">${ev.buys.map(b => `<li><b>${esc(b.name)}</b>${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`).join("")}</ul></div>` : ""}
+    ${ev.subs.length ? `<div><span class="label">Stand-ins from your collection</span><div class="list">${ev.subs.map(s => `<div class="sub"><span class="swap"><span class="need">${esc(s.missing)}</span> → ${s.replacement ? `<span class="have">${esc(s.replacement)}</span>` : `<span class="muted">nothing close in your collection</span>`}${cmpBtn(s.missing, s.replacement, s.why)}</span>${s.why ? `<span class="small muted">${esc(s.why)}</span>` : ""}</div>`).join("")}</div></div>` : ""}
+    ${ev.buys.length ? `<div><span class="label">Worth buying first</span><ul class="tight">${ev.buys.map(b => `<li><b>${esc(b.name)}</b>${cmpBtn(b.name, "", "", "Card")}${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`).join("")}</ul></div>` : ""}
     ${ev.subs.some(s => s.replacement) ? `<div class="row"><button class="primary grow" id="useSubsBtn">Make a version I can play now</button></div><p class="small muted">Uses your copies plus the stand-ins. Opens on the Build tab, where you can tweak and save it.</p>` : ""}
   </div>`;
 }
@@ -2442,9 +2499,9 @@ function renderDeckEval(d){
     ${ev.weaknesses.length ? `<div><span class="label">Weaknesses</span><ul class="tight small">${ev.weaknesses.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
     ${ev.gameplan ? `<details><summary class="small">How to play it</summary><p class="small" style="margin-top:6px">${esc(ev.gameplan)}</p></details>` : ""}
     ${ev.swaps.length ? `<div style="margin-top:8px"><span class="label">Swaps from your ${d.arena ? "Arena " : ""}collection</span>
-      ${ev.swaps.map((s2, k) => { const done = stale.includes(s2); return `<label class="pullrow ${done ? "done" : ""}"><input type="checkbox" data-sw="${k}" ${done ? "disabled" : "checked"}><span><span class="need">${esc(s2.out)}</span> → <span class="have">${esc(s2.in)}</span>${s2.why ? `<br><span class="small muted">${esc(s2.why)}</span>` : ""}${done ? ` <span class="small muted">(done)</span>` : ""}</span></label>`; }).join("")}
+      ${ev.swaps.map((s2, k) => { const done = stale.includes(s2); return `<label class="pullrow ${done ? "done" : ""}"><input type="checkbox" data-sw="${k}" ${done ? "disabled" : "checked"}><span><span class="need">${esc(s2.out)}</span> → <span class="have">${esc(s2.in)}</span>${cmpBtn(s2.out, s2.in, s2.why)}${s2.why ? `<br><span class="small muted">${esc(s2.why)}</span>` : ""}${done ? ` <span class="small muted">(done)</span>` : ""}</span></label>`; }).join("")}
       ${ev.swaps.length > stale.length ? `<div class="row" style="margin-top:6px"><button class="primary grow" id="applySwaps">Apply ticked swaps</button></div>` : ""}</div>` : `<p class="small muted">No swaps from your collection would clearly improve it.</p>`}
-    ${ev.buys.length ? `<div style="margin-top:10px"><span class="label">${d.arena ? "Worth crafting" : "Worth buying"}</span><ul class="tight small">${ev.buys.map(b => { const i = lookup(b.name); return `<li><b>${esc(b.name)}</b> ${d.arena ? `<span class="muted">${i >= 0 ? RARNAME[rarOf(card(i))] : ""}</span>` : `<span class="price">${i >= 0 ? money(buyPrice(i)) : ""}</span>`}${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`; }).join("")}</ul>
+    ${ev.buys.length ? `<div style="margin-top:10px"><span class="label">${d.arena ? "Worth crafting" : "Worth buying"}</span><ul class="tight small">${ev.buys.map(b => { const i = lookup(b.name); return `<li><b>${esc(b.name)}</b> ${d.arena ? `<span class="muted">${i >= 0 ? RARNAME[rarOf(card(i))] : ""}</span>` : `<span class="price">${i >= 0 ? money(buyPrice(i)) : ""}</span>`}${cmpBtn(b.name, "", "", "Card")}${b.why ? ` · <span class="muted">${esc(b.why)}</span>` : ""}</li>`; }).join("")}</ul>
       ${d.arena ? "" : `<div class="row" style="margin-top:6px"><button class="grow" id="evalWish">Add these to my wishlist</button></div>`}</div>` : ""}
     <div id="deckEvalMsg"></div>`;
   if ($("#applySwaps")) $("#applySwaps").onclick = async () => {
