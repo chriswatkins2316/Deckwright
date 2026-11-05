@@ -379,6 +379,9 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
         <div id="wishOut"></div>
       </div></details>
     </div>
+    <div class="panel" id="statsPanel" hidden>
+      <details id="statsDetails"><summary><b class="foldtitle">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
+    </div>
     <div class="panel" id="comboPanel" hidden>
       <details class="fold" data-fold="comboPanel"><summary><b class="foldtitle">Combos in your collection</b> <span class="small muted foldsum" id="comboPanelSum"></span></summary><div class="foldbody">
         <p class="small muted">Searches Commander Spellbook's combo database for combos you can put together from your cards, and ones you're a single card away from.</p>
@@ -412,9 +415,6 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
           </div>
         </details>
       </details>
-    </div>
-    <div class="panel" id="statsPanel" hidden>
-      <details id="statsDetails"><summary><b class="foldtitle">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
     </div>
   </section>
 
@@ -1181,6 +1181,8 @@ function renderArena(){
     ? `<div class="notice warn">The app's card list doesn't have Arena information yet. Run the weekly GitHub job once (Settings, Card data) so it knows which cards are on Arena.</div>`
     : S.arena.size ? `<div class="notice ok">${n.toLocaleString()} Arena cards (${S.arena.size.toLocaleString()} different)${S.arenaAt ? `, imported ${new Date(S.arenaAt).toLocaleDateString()}` : ""}. <button class="ghost mini danger" id="arenaClear">Clear</button></div>${S.arenaVer < 2 ? arenaOldNote() : ""}` : "";
   for (const k of ["c","u","r","m"]) { const el = $("#wild_" + k); if (el && document.activeElement !== el) el.value = w[k] || 0; }
+  // keep the Build tab's notice in step (it only redraws when the build form does)
+  if ($("#arenaOldWarn")) $("#arenaOldWarn").innerHTML = S.buildMode === "arena" && S.arena.size && S.arenaVer < 2 ? arenaOldNote() : "";
   const as = LS.get("dw.arenaSets");
   $("#arenaSetsSum").textContent = as?.sets ? `${Object.keys(as.sets).length} sets` : "";
   if ($("#arenaSetsDetails").open) renderArenaSets(false);
