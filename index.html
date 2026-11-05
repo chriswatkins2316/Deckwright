@@ -187,6 +187,12 @@ button.mini{min-height:32px;padding:2px 10px}
 .combo{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}
 .combo:last-child{border-bottom:0}
 .cpills{display:flex;flex-wrap:wrap;gap:4px}
+.foldtitle{font-family:var(--display);font-size:1.35rem}
+details.fold>summary{cursor:pointer}
+.foldbody{display:flex;flex-direction:column;gap:12px;margin-top:12px;min-width:0}
+details.subfold{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+details.subfold>summary{cursor:pointer;font-size:1.05rem}
+.rarline{display:flex;flex-wrap:wrap;gap:4px 12px}
 .cpill{font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:var(--bg)}
 .cpill.own{border-color:var(--ok)}
 .cpill.miss{border-color:var(--bad);border-style:dashed}
@@ -304,79 +310,91 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <!-- COLLECTION -->
   <section id="tab-collection" class="tabpane" style="display:flex;flex-direction:column;gap:18px">
     <div class="panel" id="importPanel">
-      <h2>Your collection</h2>
-      <label class="file" id="dropzone">
-        <input type="file" id="fileInput">
-        <strong>Import your collection</strong>
-        <span class="small muted">A CSV export from ManaBox, Delver Lens, TCGplayer, Dragon Shield, Moxfield, Deckbox and most other collection apps. In ManaBox: Collection → ⋯ → Export → CSV.</span>
-      </label>
-      <p class="small muted">If no file picker opens, open the CSV in any text app, copy everything, and paste it below.</p>
-      <details id="pasteDetails">
-        <summary class="small">Or paste a list</summary>
-        <div class="field" style="margin-top:8px">
-          <textarea id="pasteBox" placeholder="4 Lightning Bolt&#10;1 Sol Ring&#10;2 Llanowar Elves"></textarea>
-          <div class="row"><button id="pasteBtn">Read pasted list</button></div>
-        </div>
-      </details>
-      <div id="importPreview" hidden></div>
+      <details class="fold" data-fold="importPanel"><summary><b class="foldtitle">Your collection</b> <span class="small muted foldsum" id="importPanelSum"></span></summary><div class="foldbody">
+        <label class="file" id="dropzone">
+          <input type="file" id="fileInput">
+          <strong>Import your collection</strong>
+          <span class="small muted">A CSV export from ManaBox, Delver Lens, TCGplayer, Dragon Shield, Moxfield, Deckbox and most other collection apps. In ManaBox: Collection → ⋯ → Export → CSV.</span>
+        </label>
+        <p class="small muted">If no file picker opens, open the CSV in any text app, copy everything, and paste it below.</p>
+        <details id="pasteDetails">
+          <summary class="small">Or paste a list</summary>
+          <div class="field" style="margin-top:8px">
+            <textarea id="pasteBox" placeholder="4 Lightning Bolt&#10;1 Sol Ring&#10;2 Llanowar Elves"></textarea>
+            <div class="row"><button id="pasteBtn">Read pasted list</button></div>
+          </div>
+        </details>
+        <div id="importPreview" hidden></div>
+      </div></details>
     </div>
 
     <div class="panel" id="scanPanel">
-      <h2>Scan cards</h2>
-      <p class="small muted">Point your camera at a card and the app reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
-      <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
-        <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
-      <div id="scanMode"></div>
-      <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
-      <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan cards when held still</label>
-      <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
-        <div class="scanwrap" id="scanWrap"><video id="scanVideo" class="scanvideo" playsinline muted autoplay></video><div class="scanpill" id="scanPill" hidden aria-live="polite"></div></div>
-        <div class="row btnrow"><button class="primary" id="scanSnap">Scan this card</button><button class="ghost" id="scanStop">Stop camera</button></div>
-      </div>
-      <div id="scanStatus"></div>
-      <div id="scanList"></div>
+      <details class="fold" data-fold="scanPanel"><summary><b class="foldtitle">Scan cards</b> <span class="small muted foldsum" id="scanPanelSum"></span></summary><div class="foldbody">
+        <p class="small muted">Point your camera at a card and the app reads it. Keep it flat and fill most of the frame, with the bottom edge showing so the set and number can be read. Tick Foil before scanning a foil. With Auto-scan on, just hold each card still for a moment and swap in the next one.</p>
+        <div class="row btnrow"><button class="primary" id="scanStart">Start camera</button>
+          <label class="btn" style="position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:1 1 140px;cursor:pointer">Use a photo<input type="file" id="scanFile" accept="image/*" capture="environment" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:100px;cursor:pointer"></label></div>
+        <div id="scanMode"></div>
+        <label class="row small"><input type="checkbox" id="scanFoil"> The next cards I scan are foil</label>
+        <label class="row small"><input type="checkbox" id="scanAuto"> Auto-scan cards when held still</label>
+        <div id="scanCam" hidden style="display:flex;flex-direction:column;gap:8px">
+          <div class="scanwrap" id="scanWrap"><video id="scanVideo" class="scanvideo" playsinline muted autoplay></video><div class="scanpill" id="scanPill" hidden aria-live="polite"></div></div>
+          <div class="row btnrow"><button class="primary" id="scanSnap">Scan this card</button><button class="ghost" id="scanStop">Stop camera</button></div>
+        </div>
+        <div id="scanStatus"></div>
+        <div id="scanList"></div>
+      </div></details>
     </div>
 
     <div class="panel" id="collPanel">
-      <div class="stats" id="collStats"></div>
-      <div id="collValue"></div>
-      <div class="chips" id="colorBreak"></div>
-      <div class="row" id="collTools"><input type="search" id="collSearch" class="grow" style="flex:1" placeholder="Search name, type or rules text"><select id="collSort" style="width:auto" aria-label="Sort"><option value="name">A to Z</option><option value="value">Most valuable</option></select></div>
-      <div class="row" id="locTools"><select id="collLoc" style="flex:1" aria-label="Show cards in a place"></select><button class="ghost" id="locBulkBtn">Put these in…</button></div>
-      <div id="locBulk"></div>
-      <div class="chips" id="typeFilter"></div>
-      <div class="list" id="collList"></div>
-      <div class="row" id="collMore"></div>
+      <details class="fold" data-fold="collPanel"><summary><b class="foldtitle">Collection value</b> <span class="small muted foldsum" id="collPanelSum"></span></summary><div class="foldbody">
+        <div class="stats" id="collStats"></div>
+        <div id="collValue"></div>
+        <div class="chips" id="colorBreak"></div>
+        <div class="row" id="collToggleRow" hidden><button class="ghost grow" id="collToggle" aria-expanded="true" aria-controls="collBody">Hide card list</button></div>
+        <div id="collBody" style="display:flex;flex-direction:column;gap:inherit">
+        <div class="row" id="collTools"><input type="search" id="collSearch" class="grow" style="flex:1" placeholder="Search name, type or rules text"><select id="collSort" style="width:auto" aria-label="Sort"><option value="name">A to Z</option><option value="value">Most valuable</option></select></div>
+        <div class="row" id="locTools"><select id="collLoc" style="flex:1" aria-label="Show cards in a place"></select><button class="ghost" id="locBulkBtn">Put these in…</button></div>
+        <div id="locBulk"></div>
+        <div class="chips" id="typeFilter"></div>
+        <div class="list" id="collList"></div>
+        <div class="row" id="collMore"></div>
+        <div class="row"><button class="ghost grow" id="collHideBottom">Hide card list</button></div>
+        </div>
+      </div></details>
     </div>
     <div class="panel" id="tradePanel" hidden>
-      <h2>Trade and sell</h2>
-      <p class="small muted">Valuable cards you own that aren't needed by any deck you've marked as built.</p>
-      <div class="two">
-        <div class="field"><label class="label" for="tradeMin">Worth at least ($)</label><input type="text" inputmode="decimal" id="tradeMin" value="5"></div>
-        <div class="field"><span class="label">Keep</span><label class="row small" style="min-height:42px"><input type="checkbox" id="tradeKeep" checked> One copy of everything</label></div>
-      </div>
-      <div id="tradeOut"></div>
+      <details class="fold" data-fold="tradePanel"><summary><b class="foldtitle">Trade and sell</b> <span class="small muted foldsum" id="tradePanelSum"></span></summary><div class="foldbody">
+        <p class="small muted">Valuable cards you own that aren't needed by any deck you've marked as built.</p>
+        <div class="two">
+          <div class="field"><label class="label" for="tradeMin">Worth at least ($)</label><input type="text" inputmode="decimal" id="tradeMin" value="5"></div>
+          <div class="field"><span class="label">Keep</span><label class="row small" style="min-height:42px"><input type="checkbox" id="tradeKeep" checked> One copy of everything</label></div>
+        </div>
+        <div id="tradeOut"></div>
+      </div></details>
     </div>
     <div class="panel" id="wishPanel" hidden>
-      <h2>Wishlist</h2>
-      <p class="small muted">Cards you want, with the price you'd pay. Refreshing prices shows which have dropped to your target.</p>
-      <div class="field autocomplete"><label class="label" for="wishAdd">Add a card</label><input type="text" id="wishAdd" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="wishSugg" hidden></div></div>
-      <div id="wishOut"></div>
+      <details class="fold" data-fold="wishPanel"><summary><b class="foldtitle">Wishlist</b> <span class="small muted foldsum" id="wishPanelSum"></span></summary><div class="foldbody">
+        <p class="small muted">Cards you want, with the price you'd pay. Refreshing prices shows which have dropped to your target.</p>
+        <div class="field autocomplete"><label class="label" for="wishAdd">Add a card</label><input type="text" id="wishAdd" autocomplete="off" placeholder="Type a card name"><div class="sugg" id="wishSugg" hidden></div></div>
+        <div id="wishOut"></div>
+      </div></details>
     </div>
     <div class="panel" id="comboPanel" hidden>
-      <h2>Combos in your collection</h2>
-      <p class="small muted">Searches Commander Spellbook's combo database for combos you can put together from your cards, and ones you're a single card away from.</p>
-      <div class="row"><button class="grow" id="comboBtn">Find my combos</button></div>
-      <div id="comboOut"></div>
+      <details class="fold" data-fold="comboPanel"><summary><b class="foldtitle">Combos in your collection</b> <span class="small muted foldsum" id="comboPanelSum"></span></summary><div class="foldbody">
+        <p class="small muted">Searches Commander Spellbook's combo database for combos you can put together from your cards, and ones you're a single card away from.</p>
+        <div class="row"><button class="grow" id="comboBtn">Find my combos</button></div>
+        <div id="comboOut"></div>
+      </div></details>
     </div>
     <div class="panel" id="setsPanel" hidden>
-      <h2>Set completion</h2>
-      <p class="small muted">How much of each set you own, counting the exact printings from your ManaBox import. Tap a set to see what's missing and what it costs.</p>
-      <div class="row"><button class="grow" id="setsBtn">Show my sets</button></div>
-      <div id="setsOut"></div>
+      <details class="fold" data-fold="setsPanel"><summary><b class="foldtitle">Set completion</b> <span class="small muted foldsum" id="setsPanelSum"></span></summary><div class="foldbody">
+        <p class="small muted">How much of each set you own, counting the exact printings from your ManaBox import. Tap a set to see what's missing and what it costs.</p>
+        <div class="row"><button class="grow" id="setsBtn">Show my sets</button></div>
+        <div id="setsOut"></div>
+      </div></details>
     </div>
     <div class="panel" id="arenaPanel">
-      <details id="arenaDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Arena collection</b> <span class="small muted" id="arenaSum"></span></summary>
+      <details id="arenaDetails"><summary><b class="foldtitle">Arena collection</b> <span class="small muted" id="arenaSum"></span></summary>
         <p class="small muted" style="margin-top:8px">Your MTG Arena cards, kept completely apart from your paper collection. They're only used when you build an Arena deck.</p>
         <div id="arenaState"></div>
         <div class="field"><span class="label">Import your Arena cards</span>
@@ -387,10 +405,16 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
         <div class="field"><span class="label">Wildcards you have</span>
           <div class="row wildrow"><label class="wild"><span class="small">Common</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_c" value="0" aria-label="Common wildcards"></label><label class="wild"><span class="small">Uncommon</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_u" value="0" aria-label="Uncommon wildcards"></label><label class="wild"><span class="small">Rare</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_r" value="0" aria-label="Rare wildcards"></label><label class="wild"><span class="small">Mythic</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_m" value="0" aria-label="Mythic wildcards"></label></div></div>
         <div id="arenaMsg"></div>
+        <details id="arenaSetsDetails" class="subfold"><summary><b>Set completion</b> <span class="small muted" id="arenaSetsSum"></span></summary>
+          <div class="foldbody">
+            <p class="small muted">How much of each Arena set you own, from your Arena collection only (paper cards don't count). A card counts once you own a copy of it. Tap a set to see what's missing and the wildcards it would take.</p>
+            <div id="arenaSetsOut"></div>
+          </div>
+        </details>
       </details>
     </div>
     <div class="panel" id="statsPanel" hidden>
-      <details id="statsDetails"><summary><b style="font-family:var(--display);font-size:1.35rem">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
+      <details id="statsDetails"><summary><b class="foldtitle">Collection stats</b></summary><div id="statsOut" style="display:flex;flex-direction:column;gap:16px;margin-top:10px"></div></details>
     </div>
   </section>
 
@@ -401,6 +425,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
       <div class="seg" role="group" aria-label="Paper or Arena deck"><button id="modePaper" aria-pressed="true">Paper</button><button id="modeArena" aria-pressed="false">MTG Arena</button></div>
       <p class="small muted" id="buildIntro">Claude builds only from cards you own, then every card is checked against your collection and the format's legality.</p>
       <div id="arenaOpts" hidden>
+        <div id="arenaOldWarn"></div>
         <div class="field"><span class="label">Cards to use</span>
           <label class="row small"><input type="radio" name="arenaSrc" id="arenaOwned" value="owned" checked> Only cards I own on Arena</label>
           <label class="row small"><input type="radio" name="arenaSrc" id="arenaCraft" value="craft"> Let it craft cards I'm missing with wildcards</label></div>
@@ -774,7 +799,7 @@ function showPreview(res){
   S.pending = res;
   const total = [...res.out.values()].reduce((a,b)=>a+b,0);
   const miss = [...res.unmatched.entries()];
-  const box = $("#importPreview"); box.hidden = false;
+  const box = $("#importPreview"); box.hidden = false; openFold("importPanel");
   box.innerHTML = `
     <div class="notice ${miss.length ? "warn" : "ok"}">Found <b class="num">${total.toLocaleString()}</b> cards (<span class="num">${res.out.size.toLocaleString()}</span> different).
       ${miss.length ? `<br><span class="num">${miss.length}</span> name${miss.length>1?"s":""} didn't match any card and will be skipped unless you look them up.${(res.unmatchedRows || []).length ? ` <button class="mini" id="lookupBtn" style="margin-top:6px">Look them up on Scryfall</button>` : ""}` : ""}${res.lookupNote || ""}</div>
@@ -824,10 +849,12 @@ function restoreLocal(){
   S.livePrices = LS.get("dw.prices") || null; S.cheap = LS.get("dw.cheap") || {};
   S.history = LS.get("dw.history") || null; S.games = LS.get("dw.games") || []; S.life = LS.get("dw.life") || null; S.wish = LS.get("dw.wish") || []; S.upc = LS.get("dw.upc") || {}; S.loc = LS.get("dw.loc") || {}; S.scan = LS.get("dw.scan") || [];
   const a = LS.get("dw.arena") || {}; S.arena = collFromObject(a.items); S.arenaWild = { c:0, u:0, r:0, m:0, ...(a.wild || {}) }; S.arenaAt = a.updatedAt || 0;
+  // Imports before the per-printing fix could count one card several times (once per printing), so ask for a fresh import
+  S.arenaVer = a.v || (S.arena.size ? 1 : 2);
 }
 function saveArena(){
   const items = {}; for (const [i, q] of S.arena) items[card(i)[C.name]] = q;
-  LS.set("dw.arena", { items, wild:S.arenaWild, updatedAt:S.arenaAt });
+  LS.set("dw.arena", { items, wild:S.arenaWild, updatedAt:S.arenaAt, v:S.arenaVer || 2 });
 }
 async function persistCollection(){
   const items = collAsObject();
@@ -908,10 +935,12 @@ function renderCollection(){
   const total = [...S.coll.values()].reduce((a,b)=>a+b,0);
   if (!S.coll.size) {
     $("#collStats").innerHTML = ""; $("#colorBreak").innerHTML = ""; $("#typeFilter").innerHTML = ""; $("#collMore").innerHTML = "";
+    $("#collToggleRow").hidden = true; $("#collBody").hidden = false;
     $("#collTools").hidden = true; $("#locTools").hidden = true; $("#statsPanel").hidden = true; $("#collValue").innerHTML = ""; $("#tradePanel").hidden = true;
     $("#collList").innerHTML = `<div class="empty"><h3>No cards yet</h3><p class="muted small">Import your ManaBox export above. Your collection is saved on this device. Use Backup in Settings to move it to another one.</p></div>`;
     return;
   }
+  $("#collToggleRow").hidden = false; setCollOpen(S.collOpen !== false);
   $("#collTools").hidden = false; $("#locTools").hidden = false; $("#statsPanel").hidden = false; renderValue();
   const byColor = {W:0,U:0,B:0,R:0,G:0,M:0,C:0}; let cmd = 0;
   for (const [i,q] of S.coll) { const c = card(i), id = c[C.col]; if (!id) byColor.C += q; else if (id.length > 1) byColor.M += q; else byColor[id] += q; if (canCommand(c)) cmd++; }
@@ -1045,17 +1074,117 @@ function bindCardRows(root){
     d.append(cardGallery(c), p); const pe = placeEditor(c); if (pe) d.append(pe); row.appendChild(d); b.setAttribute("aria-expanded","true");
   });
 }
+/* ---------- collapsible sections on the Collection tab (remembered on this device) ---------- */
+const FOLD_LS = "dw.folds";
+function foldState(){ try { return JSON.parse(localStorage.getItem(FOLD_LS) || "{}") || {}; } catch { return {}; } }
+function openFold(id){ const d = document.querySelector(`details[data-fold="${id}"]`); if (d && !d.open) d.open = true; }
+(function initFolds(){
+  const st = foldState(), hasCards = (() => { try { return Object.keys(LS.get("dw.collection")?.items || {}).length > 0; } catch { return false; } })();
+  const dflt = { collPanel:true, importPanel:!hasCards };
+  document.querySelectorAll("details[data-fold]").forEach(d => {
+    const id = d.dataset.fold;
+    d.open = id in st ? !!st[id] : !!dflt[id];
+    d.addEventListener("toggle", () => {
+      const now = foldState(); now[id] = d.open; try { localStorage.setItem(FOLD_LS, JSON.stringify(now)); } catch {}
+      if (id === "scanPanel" && !d.open) stopScan();   // closing the scanner turns the camera off
+    });
+  });
+})();
+
+// Show/hide the card list (search, filters and cards), remembered on this device
+function setCollOpen(open){
+  S.collOpen = open; try { localStorage.setItem("dw.collOpen", open ? "1" : "0"); } catch {}
+  $("#collBody").hidden = !open; $("#collToggle").textContent = open ? "Hide card list" : "Show card list"; $("#collToggle").setAttribute("aria-expanded", String(open));
+}
+$("#collHideBottom").onclick = () => $("#collToggle").click();
+$("#collToggle").onclick = () => {
+  setCollOpen(!S.collOpen);
+  const b = $("#collToggle"), r = b.getBoundingClientRect();
+  if (!S.collOpen && (r.top < 0 || r.bottom > innerHeight)) b.scrollIntoView({ block:"center" });
+};
+try { S.collOpen = localStorage.getItem("dw.collOpen") !== "0"; } catch { S.collOpen = true; }
 let searchT; $("#collSearch").addEventListener("input", e => { clearTimeout(searchT); searchT = setTimeout(() => { S.filter.q = e.target.value; S.shown = 120; renderCollection(); }, 150); });
 
 /* ---------- Arena collection (separate from paper) ---------- */
+const arenaOldNote = () => `<div class="notice warn"><b>Please import your Arena collection again.</b> It was imported with an older version of Deckwright that could count a card once per printing, so a card you own once (like Hardened Scales with four printings) may show as 4. Builds trust these counts, so they can ask for copies you don't have.</div>`;
+/* ---------- Arena set completion (Arena collection only, never mixed with paper) ---------- */
+// Built from the Arena CSV, which lists every Arena printing with its set, rarity and how many copies you own.
+// Stored compactly: one name table with copy counts, and per set "nameIndex.rarity" entries.
+function arenaSetsFromCSV(text){
+  const rows = parseCSV(text); if (rows.length < 2) return null;
+  const h = rows[0].map(x => x.trim().toLowerCase());
+  const col = (...ks) => h.findIndex(x => ks.includes(x));
+  const iN = col("name", "card name", "card"), iS = col("set", "set code", "setcode", "edition", "expansion"), iC = col("count", "quantity", "qty", "owned", "copies"), iR = col("rarity");
+  if (iN < 0 || iS < 0 || iC < 0) return null;
+  const names = [], cnt = [], idx = new Map(), sets = {};
+  for (const r of rows.slice(1)) {
+    const name = (r[iN] || "").trim(), set = (r[iS] || "").trim().toUpperCase(); if (!name || !set) continue;
+    const rar = (r[iR] || "").trim().toLowerCase()[0] || "c"; if (rar === "b" || rar === "t") continue;   // basics and tokens aren't part of completion
+    const c = Math.max(0, parseInt(r[iC], 10) || 0);
+    let k = idx.get(name); if (k == null) { k = names.length; idx.set(name, k); names.push(name); cnt.push(c); } else cnt[k] = Math.max(cnt[k], c);
+    (sets[set] ||= new Set()).add(k + "." + ("cumr".includes(rar) ? rar : "c"));
+  }
+  const out = {}; for (const [code, v] of Object.entries(sets)) out[code] = [...v].join(",");
+  return Object.keys(out).length ? { at:Date.now(), names, cnt, sets:out } : null;
+}
+async function arenaSetNames(){
+  const c = LS.get("dw.setnames"); if (c && Date.now() - c.t < 14 * 864e5) return c.n;
+  try {
+    const r = await sfFetch("https://api.scryfall.com/sets"); if (!r.ok) throw 0;
+    const j = await r.json(), n = {}; for (const x of j.data || []) n[x.code.toUpperCase()] = [x.name, (x.released_at || "").slice(0, 4)];
+    LS.set("dw.setnames", { t:Date.now(), n }); return n;
+  } catch { return c?.n || {}; }
+}
+function arenaSetRows(as){
+  return Object.entries(as.sets).map(([code, str]) => {
+    const items = str.split(",").map(e => { const [k, r] = e.split("."); return { k:+k, r }; });
+    const have = items.filter(x => as.cnt[x.k] > 0).length, sets4 = items.filter(x => as.cnt[x.k] >= 4).length;
+    return { code, items, size:items.length, have, sets4 };
+  }).filter(r => r.size >= 10).sort((a, b) => b.have / b.size - a.have / a.size || b.have - a.have);
+}
+async function renderArenaSets(all){
+  const out = $("#arenaSetsOut"), as = LS.get("dw.arenaSets");
+  if (!as?.sets) { out.innerHTML = `<p class="small muted">${S.arena.size ? "Import your Arena collection again as a CSV file (with Set and Rarity columns) to see set completion. A plain list of card names doesn't say which set each card is from." : "Import your Arena collection above to see set completion."}</p>`; return; }
+  if (all == null) all = !!S.arenaSetsAll; S.arenaSetsAll = all;
+  const rows = arenaSetRows(as), names = await arenaSetNames(), shown = all ? rows : rows.slice(0, 25);
+  if (!rows.length) { out.innerHTML = `<p class="small muted">No Arena sets found in your import.</p>`; return; }
+  out.innerHTML = `${shown.map(r => { const pct = Math.round(r.have / r.size * 100), nm = names[r.code];
+      return `<button class="setrow" data-aset="${esc(r.code)}"><span>${nm ? `<b>${esc(nm[0])}</b> <span class="muted small">${esc(r.code)}${nm[1] ? " · " + esc(nm[1]) : ""}</span>` : `<b>${esc(r.code)}</b>`}</span><span class="num small">${r.have}/${r.size} · ${pct}%</span><span class="meter"><i style="width:${pct}%"></i></span>${r.sets4 ? `<span class="small muted" style="grid-column:1/-1">${r.sets4} full playset${r.sets4 === 1 ? "" : "s"}</span>` : ""}</button><div data-asetout="${esc(r.code)}"></div>`; }).join("")}
+    ${!all && rows.length > 25 ? `<div class="row"><button class="ghost grow" id="arenaSetsAll">Show all ${rows.length} sets</button></div>` : ""}`;
+  out.querySelectorAll("[data-aset]").forEach(b => b.onclick = () => arenaSetMissing(b.dataset.aset));
+  if ($("#arenaSetsAll")) $("#arenaSetsAll").onclick = () => renderArenaSets(true);
+}
+function arenaSetMissing(code){
+  const box = document.querySelector(`[data-asetout="${code}"]`); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  const as = LS.get("dw.arenaSets"), row = arenaSetRows(as).find(r => r.code === code); if (!row) return;
+  const ORDER = "mruc", w = S.arenaWild || {};
+  const miss = row.items.filter(x => !(as.cnt[x.k] > 0)).sort((a, b) => ORDER.indexOf(a.r) - ORDER.indexOf(b.r) || as.names[a.k].localeCompare(as.names[b.k]));
+  const one = { m:0, r:0, u:0, c:0 }, four = { m:0, r:0, u:0, c:0 };
+  for (const x of row.items) { const c = as.cnt[x.k] || 0; if (!c) one[x.r]++; four[x.r] += Math.max(0, 4 - c); }
+  const wl = o => [...ORDER].filter(r => o[r]).map(r => `<span><b class="num">${o[r]}</b> ${RARNAME[r].toLowerCase()}${(w[r] || 0) >= o[r] ? ` <span class="have">✓</span>` : ""}</span>`).join("") || "<span>nothing</span>";
+  box.innerHTML = `<div style="padding:6px 0 12px;display:flex;flex-direction:column;gap:8px">
+    <p class="small"><b>${miss.length}</b> card${miss.length === 1 ? "" : "s"} missing.</p>
+    <div class="small"><span class="label">Wildcards to own one of each</span><div class="rarline">${wl(one)}</div></div>
+    <div class="small"><span class="label">Wildcards for full playsets</span><div class="rarline">${wl(four)}</div></div>
+    <p class="small muted">A ✓ means you have enough of those wildcards now.</p>
+    ${miss.length ? `<div class="list">${miss.slice(0, 80).map(x => `<div class="mover"><span>${esc(as.names[x.k])}</span><span class="small muted">${RARNAME[x.r]}</span></div>`).join("")}</div>
+    ${miss.length > 80 ? `<p class="small muted">Showing 80 of ${miss.length}, rarest first.</p>` : ""}
+    <div class="row btnrow"><button data-asetcopy="${esc(code)}">Copy missing list</button></div>` : `<p class="small have">You own every card in this set.</p>`}</div>`;
+  const cp = box.querySelector("[data-asetcopy]"); if (cp) cp.onclick = e => copyText(miss.map(x => `1 ${as.names[x.k]}`).join("\n"), e.target, box);
+}
+$("#arenaSetsDetails").addEventListener("toggle", () => { if ($("#arenaSetsDetails").open) renderArenaSets(); });
 function renderArena(){
   const n = [...S.arena.values()].reduce((a, b) => a + b, 0), w = S.arenaWild;
   $("#arenaSum").textContent = S.arena.size ? `${S.arena.size.toLocaleString()} different cards` : "not imported";
   $("#arenaState").innerHTML = !hasArenaData()
     ? `<div class="notice warn">The app's card list doesn't have Arena information yet. Run the weekly GitHub job once (Settings, Card data) so it knows which cards are on Arena.</div>`
-    : S.arena.size ? `<div class="notice ok">${n.toLocaleString()} Arena cards (${S.arena.size.toLocaleString()} different)${S.arenaAt ? `, imported ${new Date(S.arenaAt).toLocaleDateString()}` : ""}. <button class="ghost mini danger" id="arenaClear">Clear</button></div>` : "";
+    : S.arena.size ? `<div class="notice ok">${n.toLocaleString()} Arena cards (${S.arena.size.toLocaleString()} different)${S.arenaAt ? `, imported ${new Date(S.arenaAt).toLocaleDateString()}` : ""}. <button class="ghost mini danger" id="arenaClear">Clear</button></div>${S.arenaVer < 2 ? arenaOldNote() : ""}` : "";
   for (const k of ["c","u","r","m"]) { const el = $("#wild_" + k); if (el && document.activeElement !== el) el.value = w[k] || 0; }
-  if ($("#arenaClear")) $("#arenaClear").onclick = e => { const b = e.target; if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to clear"; return; } S.arena = new Map(); S.arenaAt = Date.now(); saveArena(); renderArena(); };
+  const as = LS.get("dw.arenaSets");
+  $("#arenaSetsSum").textContent = as?.sets ? `${Object.keys(as.sets).length} sets` : "";
+  if ($("#arenaSetsDetails").open) renderArenaSets(false);
+  if ($("#arenaClear")) $("#arenaClear").onclick = e => { const b = e.target; if (!b.dataset.c) { b.dataset.c = 1; b.textContent = "Tap again to clear"; return; } S.arena = new Map(); S.arenaAt = Date.now(); S.arenaVer = 2; saveArena(); LS.set("dw.arenaSets", null); renderArena(); };
 }
 function importArena(text){
   if (!S.cards.length) return;
@@ -1063,7 +1192,9 @@ function importArena(text){
   for (const [i, q] of res.out) { const c = card(i); if (!onArena(c) && hasArenaData()) continue; m.set(i, Math.min(isBasic(c) ? 99 : 4, (m.get(i) || 0) + q)); }
   const skipped = [...res.out.keys()].filter(i => !m.has(i)).length, unk = res.unmatched.size;
   if (!m.size) { $("#arenaMsg").innerHTML = `<div class="notice warn">No Arena cards found in that list.</div>`; return; }
-  S.arena = m; S.arenaAt = Date.now(); saveArena(); renderArena();
+  S.arena = m; S.arenaAt = Date.now(); S.arenaVer = 2; saveArena();
+  const sets = arenaSetsFromCSV(text); LS.set("dw.arenaSets", sets); S.arenaSetsView = null;
+  renderArena();
   $("#arenaMsg").innerHTML = `<div class="notice ok">Saved ${m.size.toLocaleString()} different Arena cards.${unk ? ` ${unk} name${unk === 1 ? "" : "s"} didn't match a card.` : ""}${skipped ? ` ${skipped} card${skipped === 1 ? " isn't" : "s aren't"} on Arena and ${skipped === 1 ? "was" : "were"} left out.` : ""} Your paper collection wasn't touched.</div>`;
   $("#arenaPaste").value = "";
 }
@@ -1094,6 +1225,7 @@ function renderBuildForm(){
   LS.set("dw.fmt." + S.buildMode, fmt);
   $("#modePaper").setAttribute("aria-pressed", String(!arena)); $("#modeArena").setAttribute("aria-pressed", String(arena));
   $("#arenaOpts").hidden = !arena; $("#craftLimits").hidden = !craft;
+  $("#arenaOldWarn").innerHTML = arena && S.arena.size && S.arenaVer < 2 ? arenaOldNote() : "";
   $("#basicsField").hidden = arena; $("#freeOnlyRow").hidden = arena;
   $("#buildIntro").textContent = arena ? "Builds an MTG Arena deck from your Arena collection. Your paper collection and paper decks aren't touched." : "Claude builds only from cards you own, then every card is checked against your collection and the format's legality.";
   $("#cmdInput").placeholder = arena ? (craft ? "Leave blank and Claude picks one" : "Leave blank and Claude picks one you own on Arena") : "Leave blank and Claude picks one you own";
@@ -3161,7 +3293,7 @@ $("#gnGo").onclick = () => {
 };
 
 /* ================= sync through a private GitHub Gist ================= */
-const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn","dw.upc","dw.arena"];
+const SYNC_KEYS = ["dw.collection","dw.decks","dw.prints","dw.games","dw.history","dw.wish","dw.loc","dw.prices","dw.gn","dw.upc","dw.arena","dw.arenaSets"];
 const SYNC_FILE = "deckwright-sync.json", GH = "https://api.github.com";
 const syncCfg = () => { try { return JSON.parse(localStorage.getItem("dw.sync")) || {}; } catch { return {}; } };
 const saveSyncCfg = c => { try { localStorage.setItem("dw.sync", JSON.stringify(c)); } catch {} };
@@ -3579,6 +3711,7 @@ function renderWish(){
   const box = $("#wishOut"); if (!box) return;
   if (!S.wish) S.wish = [];
   $("#wishPanel").hidden = !S.cards.length;
+  if ($("#wishPanelSum")) $("#wishPanelSum").textContent = S.wish.length ? `${S.wish.length} card${S.wish.length === 1 ? "" : "s"}` : "";
   if (!S.wish.length) { box.innerHTML = `<p class="small muted">Nothing on your wishlist yet.</p>`; return; }
   const rows = S.wish.map(w => ({ w, p:wishPrice(w), hit: w.target != null && wishPrice(w) > 0 && wishPrice(w) <= w.target }));
   rows.sort((a, b) => (b.hit - a.hit) || a.w.name.localeCompare(b.w.name));
@@ -3791,9 +3924,11 @@ async function showSets(all){
     if (!rows.length) { out.innerHTML = `<p class="small muted">No set printings found. Import your ManaBox CSV so the app knows which printings you have.</p>`; return; }
     const shown = all ? rows : rows.slice(0, 25);
     out.innerHTML = `<div style="margin-top:8px">${shown.map(r => `<button class="setrow" data-set="${esc(r.code)}"><span><b>${esc(r.name)}</b> <span class="muted small">${esc(r.code.toUpperCase())} · ${esc(r.date.slice(0, 4))}</span></span><span class="num small">${r.have}/${r.size} · ${Math.round(r.have / r.size * 100)}%</span><span class="meter"><i style="width:${Math.round(r.have / r.size * 100)}%"></i></span></button><div data-setout="${esc(r.code)}"></div>`).join("")}</div>
-      ${!all && rows.length > 25 ? `<div class="row"><button class="ghost grow" id="setsAll">Show all ${rows.length} sets</button></div>` : ""}`;
+      <div class="row btnrow">${!all && rows.length > 25 ? `<button class="ghost grow" id="setsAll">Show all ${rows.length} sets</button>` : ""}<button class="ghost grow" id="setsHide">Hide my sets</button></div>`;
+    btn.textContent = "Hide my sets"; S.setsOpen = true;
     out.querySelectorAll("[data-set]").forEach(b => b.onclick = () => setMissing(b.dataset.set));
     if ($("#setsAll")) $("#setsAll").onclick = () => showSets(true);
+    $("#setsHide").onclick = hideSets;
   } catch (e) { console.warn(e); out.innerHTML = `<div class="notice bad">Couldn't reach Scryfall for the set list. Try again in a minute.</div>`; }
   finally { btn.disabled = false; }
 }
@@ -3820,7 +3955,12 @@ async function setMissing(code){
     box.querySelector("[data-setwish]").onclick = e => { const n = addToWish(miss.map(m => [m.name, 1])); e.target.textContent = `Added ${n}`; };
   } catch (e) { console.warn(e); box.innerHTML = `<div class="notice bad">Couldn't get that set from Scryfall. Try again in a minute.</div>`; }
 }
-$("#setsBtn").onclick = () => showSets(false);
+function hideSets(){
+  $("#setsOut").innerHTML = ""; $("#setsBtn").textContent = "Show my sets"; S.setsOpen = false;
+  const b = $("#setsBtn"), r = b.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > innerHeight) b.scrollIntoView({ block:"center" });   // after hiding from the bottom of a long list, land back on the button
+}
+$("#setsBtn").onclick = () => S.setsOpen ? hideSets() : showSets(false);
 
 /* ---------- prices ---------- */
 const money = n => "$" + (Math.round((n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
@@ -3848,10 +3988,11 @@ function buyPrice(i){ const c = S.cheap?.[card(i)[C.name]]; return c ? c[0] : ba
 function collectionValue(){ let v = 0; for (const i of S.coll.keys()) v += ownedValue(i); return v; }
 function renderValue(){
   const box = $("#collValue"); if (!box) return;
+  if ($("#collPanelSum")) $("#collPanelSum").textContent = S.coll.size ? money(collectionValue()) : "";
   if (!S.coll.size) { box.innerHTML = ""; return; }
   const lp = S.livePrices, m = window.MTG_DB?.meta || {};
   const priced = (S.prints || []).length;
-  box.innerHTML = `<div class="valuebox"><div class="grow"><span class="label">Collection value</span><div class="bignum">${money(collectionValue())}</div>
+  box.innerHTML = `<div class="valuebox"><div class="grow"><div class="bignum">${money(collectionValue())}</div>
     <p class="small muted">${lp ? (lp.partial ? `Partly refreshed: ${(lp.done || []).length.toLocaleString()} of ${(lp.total || 0).toLocaleString()} printings priced on ${esc(lp.date)}. Tap Refresh prices to finish.` : `Your exact printings and foils, Scryfall prices from ${esc(lp.date)}.`) : `Estimate from typical prices (${esc(m.priceDate || m.date || "")}).${priced ? " Refresh to price your exact printings and foils." : ""}`}</p></div>
     ${priced ? `<button id="priceBtn">Refresh prices</button>` : ""}</div><div id="priceMsg"></div>${historyHTML()}`;
   if ($("#priceBtn")) $("#priceBtn").onclick = refreshPrices;
