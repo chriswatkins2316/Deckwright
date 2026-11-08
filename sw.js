@@ -1,7 +1,8 @@
 // Deckwright offline support. Bump VERSION whenever any app file changes.
-const VERSION = "deckwright-v41";
+const VERSION = "deckwright-v42";
 const FONTS = "deckwright-fonts";
 const LIBS = "deckwright-libs";   // the on-device card reader, downloaded on first use
+const SHARE = "deckwright-share"; // a file shared to Deckwright from another app, waiting for the page to pick it up
 const SHELL = ["./", "index.html", "cards.js", "manifest.webmanifest",
   "qrcode.js", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];
 
@@ -16,13 +17,27 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== FONTS && k !== LIBS).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== FONTS && k !== LIBS && k !== SHARE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", e => {
   const req = e.request;
+  // "Share" from another app (a collection CSV from untapped.gg or ManaBox): keep the file, then open the app to import it
+  if (req.method === "POST" && new URL(req.url).pathname.endsWith("/share-target")) {
+    e.respondWith((async () => {
+      try {
+        const fd = await req.formData(), f = fd.get("file");
+        const text = f && typeof f.text === "function" ? await f.text() : String(fd.get("text") || "");
+        const name = f && f.name ? f.name : "shared text";
+        const c = await caches.open(SHARE);
+        await c.put("shared-file", new Response(text, { headers:{ "content-type":"text/plain; charset=utf-8", "x-name":encodeURIComponent(name) } }));
+      } catch (err) { console.warn("share failed", err); }
+      return Response.redirect("./?shared=1", 303);
+    })());
+    return;
+  }
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 

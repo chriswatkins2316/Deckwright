@@ -309,6 +309,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
 
   <!-- COLLECTION -->
   <section id="tab-collection" class="tabpane" style="display:flex;flex-direction:column;gap:18px">
+    <div class="panel" id="shareOffer" hidden></div>
     <div class="panel" id="importPanel">
       <details class="fold" data-fold="importPanel"><summary><b class="foldtitle">Your collection</b> <span class="small muted foldsum" id="importPanelSum"></span></summary><div class="foldbody">
         <label class="file" id="dropzone">
@@ -407,6 +408,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
           <div class="row btnrow"><button class="grow" id="arenaPasteBtn">Use the pasted list</button></div></div>
         <div class="field"><span class="label">Wildcards you have</span>
           <div class="row wildrow"><label class="wild"><span class="small">Common</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_c" value="0" aria-label="Common wildcards"></label><label class="wild"><span class="small">Uncommon</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_u" value="0" aria-label="Uncommon wildcards"></label><label class="wild"><span class="small">Rare</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_r" value="0" aria-label="Rare wildcards"></label><label class="wild"><span class="small">Mythic</span><input type="number" min="0" max="999" inputmode="numeric" id="wild_m" value="0" aria-label="Mythic wildcards"></label></div></div>
+        <p class="small muted">Got the CSV on your phone? Tap <b>Share</b> on the file and pick <b>Deckwright</b> to import it in one step. <a href="https://mtga.untapped.gg/" target="_blank" rel="noopener">Open untapped.gg</a></p>
         <div id="arenaMsg"></div>
         <details id="arenaSetsDetails" class="subfold"><summary><b>Set completion</b> <span class="small muted" id="arenaSetsSum"></span></summary>
           <div class="foldbody">
@@ -684,6 +686,7 @@ function loadDB(){
     restoreLocal();
     renderAll();
     handleSharedLink();
+    handleSharedFile();
     syncNow(true);
   };
   s.onerror = () => { $("#dbstatus").textContent = "The card database didn't load. Reload the page to try again."; };
@@ -3871,6 +3874,53 @@ async function shareDeck(d){
   $("#shareLink").onfocus = e => e.target.select();
   if ($("#shareNative")) $("#shareNative").onclick = () => navigator.share({ title:d.name, text:`${d.name}, a ${FMT[d.format].label} deck`, url:link }).catch(() => {});
 }
+/* ---------- files shared to Deckwright from another app (installed app's share sheet, or Forgewright) ---------- */
+// Arena CSVs (untapped.gg) have Count/PrintCount and no Scryfall or collector columns; ManaBox CSVs have them.
+function sharedKind(text){
+  const head = (text.split(/\r?\n/, 1)[0] || "").toLowerCase();
+  if (/scryfall id|manabox id|collector number|binder/.test(head)) return "paper";
+  if (/printcount/.test(head) || (/(^|,)\s*"?count"?\s*(,|$)/.test(head) && /rarity/.test(head) && /(^|,)\s*"?set"?\s*(,|$)/.test(head))) return "arena";
+  return "";
+}
+function showShareOffer(name, text){
+  if (!S.cards.length) { S.pendingShare = { name, text }; return; }
+  const box = $("#shareOffer"), kind = sharedKind(text), lines = text.split(/\r?\n/).filter(l => l.trim()).length;
+  showTab("collection");
+  box.hidden = false;
+  box.innerHTML = `<h2 style="margin:0">Import shared file</h2>
+    <p class="small"><b>${esc(name)}</b> · ${lines.toLocaleString()} line${lines === 1 ? "" : "s"}. ${kind === "arena" ? "This looks like your <b>MTG Arena</b> collection." : kind === "paper" ? "This looks like a <b>paper</b> collection (ManaBox)." : "Which collection is it for?"}</p>
+    <div class="row btnrow">
+      <button class="${kind === "paper" ? "ghost" : "primary"}" id="shareArena">Import as Arena collection</button>
+      <button class="${kind === "paper" ? "primary" : "ghost"}" id="sharePaper">Import as paper collection</button>
+      <button class="ghost" id="shareCancel">Cancel</button>
+    </div>
+    <p class="small muted">Arena replaces your Arena collection. Paper lets you choose to add or replace before anything changes.</p>`;
+  box.scrollIntoView({ block:"start" });
+  const done = () => { box.hidden = true; box.innerHTML = ""; };
+  $("#shareCancel").onclick = done;
+  $("#shareArena").onclick = () => {
+    done(); importArena(text);
+    openFold("arenaPanel"); const d = $("#arenaDetails"); if (d) d.open = true;
+    ($("#arenaMsg") || d)?.scrollIntoView({ block:"center" });
+  };
+  $("#sharePaper").onclick = () => {
+    done(); openFold("importPanel");
+    showPreview(readImport(text)); $("#importPreview").scrollIntoView({ block:"start" });
+  };
+}
+async function handleSharedFile(){
+  if (S.pendingShare) { const p = S.pendingShare; S.pendingShare = null; showShareOffer(p.name, p.text); return; }
+  if (!new URLSearchParams(location.search).has("shared")) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  try {
+    const c = await caches.open("deckwright-share"), r = await c.match("shared-file"); if (!r) return;
+    const text = await r.text(), name = decodeURIComponent(r.headers.get("x-name") || "shared file");
+    await c.delete("shared-file");
+    if (text.trim()) showShareOffer(name, text);
+  } catch (e) { console.warn(e); }
+}
+// Forgewright hands shared files over directly
+window.deckwrightReceiveFile = (name, text) => showShareOffer(String(name || "shared file"), String(text || ""));
 async function handleSharedLink(){
   const m = location.hash.match(/^#deck=([\w-]+)$/); if (!m) return;
   history.replaceState(null, "", location.pathname + location.search);
