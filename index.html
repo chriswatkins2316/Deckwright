@@ -727,6 +727,7 @@ function loadDB(){
     handleSharedLink();
     handleSharedFile();
     syncNow(true);
+    warmSfIds();
   };
   s.onerror = () => { $("#dbstatus").textContent = "The card database didn't load. Reload the page to try again."; };
   document.body.appendChild(s);
@@ -1027,7 +1028,7 @@ function cardGallery(c){
   const wrap = document.createElement("div"); wrap.className = "gallery";
   wrap.innerHTML = `<div class="gtrack" tabindex="0" aria-label="${esc(name)}${prints.length > 1 ? `, ${prints.length} printings you own. Swipe or use the arrow keys to see them.` : ""}">${slides.map(p => {
       const src = p ? `https://api.scryfall.com/cards/${encodeURIComponent(p.set)}/${encodeURIComponent(p.cn)}?format=image&version=normal`
-        : `https://api.scryfall.com/cards/named?format=image&version=normal&exact=${encodeURIComponent(name.split(" // ")[0])}`;
+        : sfImg(name.split(" // ")[0], "normal");
       const cap = p ? `${esc(setNames[p.set]?.[0] || p.set.toUpperCase())} · #${esc(p.cn)}${p.finish !== "normal" ? ` · <b>${p.finish === "etched" ? "Etched foil" : "Foil"}</b>` : ""} · ${p.qty} cop${p.qty === 1 ? "y" : "ies"} · <span class="price">${money(printPrice(p, i))}</span>` : "";
       return `<figure class="gslide"><img class="cardimg${p && p.finish !== "normal" ? " foil" : ""}" loading="lazy" alt="${esc(name)}${p ? ", " + esc(p.set.toUpperCase()) + " printing" : ""}" src="${src}">${cap ? `<figcaption class="small">${cap}</figcaption>` : ""}</figure>`;
     }).join("")}</div>
@@ -1040,6 +1041,32 @@ function cardGallery(c){
   wrap.querySelectorAll("img").forEach(img => img.onerror = () => { if (slides.length === 1 && !prints.length) wrap.remove(); else img.style.visibility = "hidden"; });
   return wrap;
 }
+/* ---------- card images by name ----------
+   Scryfall's name lookup ignores punctuation, so Unfinity's blank-name cards ("_____ Goblin") come back as the
+   Goblin token. For those, find the real card once with an exact-name search and remember its Scryfall ID. */
+const sfOddName = n => /_/.test(n);
+function sfImg(name, version = "normal", back = false){
+  const id = sfOddName(name) && (LS.get("dw.sfid") || {})[name];
+  return id ? `https://api.scryfall.com/cards/${id}?format=image&version=${version}${back ? "&face=back" : ""}`
+    : `https://api.scryfall.com/cards/named?format=image&version=${version}${back ? "&face=back" : ""}&exact=${encodeURIComponent(name)}`;
+}
+async function sfIdFor(name){
+  const ids = LS.get("dw.sfid") || {}; if (ids[name]) return ids[name];
+  const rx = name.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&").replace(/ /g, "\\s");
+  try {
+    const r = await sfFetch("https://api.scryfall.com/cards/search?q=" + encodeURIComponent(`name:/^${rx}$/ -is:token`)); if (!r.ok) return null;
+    const j = await r.json(), hit = (j.data || []).find(c => c.name === name) || j.data?.[0]; if (!hit) return null;
+    ids[name] = hit.id; LS.set("dw.sfid", ids); return hit.id;
+  } catch { return null; }
+}
+// Look up any blank-name cards you own or have in decks once, so their pictures are right from then on
+async function warmSfIds(){
+  const names = new Set(), ids = LS.get("dw.sfid") || {};
+  for (const i of S.coll.keys()) { const n = card(i)?.[C.name]; if (n && sfOddName(n)) names.add(n); }
+  for (const d of S.decks) for (const e of [...(d.cards || []), ...(d.commander ? [{ name:d.commander }] : [])]) if (e.name && sfOddName(e.name)) names.add(e.name);
+  for (const n of names) if (!ids[n]) { await sfIdFor(n); await sleep(120); }
+}
+
 /* ---------- swap suggestions: see the card going out, swipe to the card coming in ---------- */
 function localFaceHTML(name){
   const i = lookup(name); if (i < 0) return `<div class="lface"><p><b>${esc(name)}</b></p></div>`;
@@ -1048,7 +1075,7 @@ function localFaceHTML(name){
 }
 function cmpImg(name){
   const i = lookup(name), n = (i >= 0 ? card(i)[C.name] : name).split(" // ")[0];
-  return `https://api.scryfall.com/cards/named?format=image&version=normal&exact=${encodeURIComponent(n)}`;
+  return sfImg(n, "normal");
 }
 // cards: [{ name, tag:"out"|"in"|"", label }]
 function compareView(cards, why, opt = {}){
@@ -3628,6 +3655,10 @@ attachCardSearch($("#ruleCard"), $("#ruleSugg"), i => { const n = card(i)[C.name
 S.rulingCache = {}; S.sfCardCache = {};
 async function getCardJSON(name){
   if (S.sfCardCache[name]) return S.sfCardCache[name];
+  if (sfOddName(name)) {
+    const id = await sfIdFor(name);
+    if (id) { const r = await sfFetch("https://api.scryfall.com/cards/" + id); if (r.ok) return (S.sfCardCache[name] = await r.json()); }
+  }
   const r = await sfFetch("https://api.scryfall.com/cards/named?exact=" + encodeURIComponent(name));
   if (!r.ok) throw new Error("Scryfall couldn't find " + name);
   return (S.sfCardCache[name] = await r.json());
@@ -3797,7 +3828,7 @@ async function decodeDeck(s){
 }
 /* ---------- proxies: printable card images for playtesting ---------- */
 // Images come from Scryfall unaltered (artist and copyright line kept), printed at real card size, 9 to a page.
-const pxImg = (name, back) => `https://api.scryfall.com/cards/named?format=image&version=large${back ? "&face=back" : ""}&exact=${encodeURIComponent(name)}`;
+const pxImg = (name, back) => sfImg(name, "large", back);
 const isTwoSided = n => { const i = lookup(n); if (i < 0) return false; const c = card(i); return c[C.name].includes(" // ") && !/ \/\/ /.test(c[C.cost]); };
 function proxyPanel(box, entries){
   let showAll = !entries.some(e => e.def > 0);
