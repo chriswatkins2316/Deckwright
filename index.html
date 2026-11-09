@@ -120,12 +120,12 @@ label.file strong{font-size:1rem}
 .autocomplete{position:relative}
 .sugg{position:absolute;left:0;right:0;top:100%;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:260px;overflow:auto;box-shadow:0 8px 24px rgb(0 0 0 / .18)}
 .sugg button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-weight:500}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
 nav.tabs button{border:0;border-radius:0;background:transparent;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:.8rem}
 nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
 nav.tabs button[aria-current="page"]{color:var(--accent)}
-nav.tabs.withforge{grid-template-columns:repeat(7,minmax(0,1fr))}
-nav.tabs.withforge button{font-size:.6rem;min-width:0;overflow:hidden;padding:0 1px;letter-spacing:-.01em}
+nav.tabs.withforge{grid-template-columns:repeat(8,minmax(0,1fr))}
+nav.tabs.withforge button{font-size:.56rem;min-width:0;overflow:hidden;padding:0 1px;letter-spacing:-.01em}
 .empty{text-align:center;padding:26px 10px;display:flex;flex-direction:column;gap:8px;align-items:center}
 .stream{font:500 .78rem var(--mono);color:var(--muted);max-height:4.5em;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 details summary{cursor:pointer;font-weight:600}
@@ -147,7 +147,7 @@ details summary{cursor:pointer;font-weight:600}
 .costline{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .costline b{display:block;font:500 1.35rem var(--mono);font-variant-numeric:tabular-nums}
 .price{font-family:var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
-nav.tabs button{font-size:.68rem}
+nav.tabs button{font-size:.62rem;min-width:0;overflow:hidden;padding:0 1px}
 nav.tabs button svg{width:20px;height:20px}
 .saved .conf{grid-column:1/-1}
 .builtbox{min-height:34px}
@@ -188,6 +188,12 @@ button.mini{min-height:32px;padding:2px 10px}
 .combo:last-child{border-bottom:0}
 .cpills{display:flex;flex-wrap:wrap;gap:4px}
 .foldtitle{font-family:var(--display);font-size:1.35rem}
+.newsitem{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start;text-decoration:none;color:var(--fg);padding:12px 0;border-top:1px solid var(--line)}
+.newsitem:first-child{border-top:0}
+.newsitem img{width:96px;height:64px;object-fit:cover;border-radius:6px;background:var(--sunk)}
+.newsitem .noimg{width:96px;height:64px;border-radius:6px;background:var(--sunk)}
+.newsitem b{display:block;line-height:1.3}
+.newsitem p{margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 details.fold>summary{cursor:pointer}
 .foldbody{display:flex;flex-direction:column;gap:12px;margin-top:12px;min-width:0}
 details.subfold{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
@@ -589,6 +595,15 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   </section>
 
   <!-- SETTINGS -->
+  <section id="tab-news" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="panel">
+      <h2>MTG news</h2>
+      <p class="small muted">The latest from Daily MTG, the official Magic news site. Tap a story to read it.</p>
+      <div class="row btnrow"><a class="btn primary grow" href="https://magic.wizards.com/en/news" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Open Daily MTG</a></div>
+      <div id="newsList"></div>
+      <p class="small muted" id="newsInfo"></p>
+    </div>
+  </section>
   <section id="tab-settings" class="tabpane" hidden style="display:flex;flex-direction:column;gap:18px">
     <div class="panel">
       <h2>Claude</h2>
@@ -644,6 +659,7 @@ ul.tight{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
   <button data-tab="check"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/></svg>Check</button>
   <button data-tab="decks"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6"/></svg>Decks</button>
   <button data-tab="play"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>Play</button>
+  <button data-tab="news"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5M7 8h7M7 12h7M7 16h4"/></svg>News</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
   <button id="forgeTab" hidden aria-label="Back to Forge"><svg viewBox="0 0 24 24"><path d="M3 9h11l3-3h4v4l-3 2H14"/><path d="M8 9v4h6v-4M9 13l-2 8M13 13l2 8M6 21h12"/></svg>Forge</button>
 </nav>
@@ -4551,11 +4567,27 @@ $("#updCards").onclick = async () => {
 };
 
 /* ---------- tabs & boot ---------- */
+/* ---------- News: headlines from Daily MTG, gathered daily by the site's GitHub job into news.json ---------- */
+async function renderNews(){
+  const list = $("#newsList"), info = $("#newsInfo");
+  if (!S.news) {
+    list.innerHTML = `<div class="empty"><div class="spin"></div></div>`;
+    try { const r = await fetch("news.json", { cache:"no-cache" }); if (!r.ok) throw 0; S.news = await r.json(); }
+    catch { list.innerHTML = ""; info.textContent = navigator.onLine ? "Headlines aren't available yet. Open Daily MTG above for the latest." : "You're offline. Headlines show once you're back online."; return; }
+  }
+  const items = (S.news.items || []).filter(x => x.title && /^https:\/\/magic\.wizards\.com\//.test(x.url));
+  const when = d => { if (!d) return ""; const t = new Date(d + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString(undefined, { month:"short", day:"numeric", year: t.getFullYear() === new Date().getFullYear() ? undefined : "numeric" }); };
+  list.innerHTML = items.length ? `<div>${items.map(x => `<a class="newsitem" href="${esc(x.url)}" target="_blank" rel="noopener">
+      ${/^https:\/\//.test(x.image || "") ? `<img loading="lazy" alt="" src="${esc(x.image)}" onerror="this.outerHTML='<span class=noimg></span>'">` : `<span class="noimg"></span>`}
+      <span><span class="small muted">${esc(x.section || "")}${x.date ? (x.section ? " · " : "") + esc(when(x.date)) : ""}</span><b>${esc(x.title)}</b>${x.summary ? `<p class="small muted">${esc(x.summary)}</p>` : ""}</span></a>`).join("")}</div>` : "";
+  info.textContent = S.news.updated ? `Headlines from magic.wizards.com, checked ${new Date(S.news.updated.replace("Z", ":00Z")).toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}.` : "";
+}
 function showTab(t){
   document.querySelectorAll(".tabpane").forEach(p => p.hidden = p.id !== "tab-" + t);
   document.querySelectorAll("nav.tabs button[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === t ? "page" : "false"));
   LS.set("dw.tab", t); window.scrollTo(0, 0);
   if (t === "play") renderPlay();
+  if (t === "news") renderNews();
   if (t !== "collection") stopScan();
 }
 document.querySelectorAll("nav.tabs button[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
