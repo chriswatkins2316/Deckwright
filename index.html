@@ -724,7 +724,6 @@ function loadDB(){
     const m = { ...(window.MTG_DB.meta || {}), ...(S.overlayDate ? { date:S.overlayDate } : {}) };
     $("#dbstatus").textContent = `${S.cards.length.toLocaleString()} cards${m.source ? " from " + m.source : ""}${m.date ? " (" + m.date + ")" : ""} · works offline`;
     restoreLocal();
-    fixBlankNameTokens();
     renderAll();
     handleSharedLink();
     handleSharedFile();
@@ -896,20 +895,6 @@ function restoreLocal(){
   const a = LS.get("dw.arena") || {}; S.arena = collFromObject(a.items); S.arenaWild = { c:0, u:0, r:0, m:0, ...(a.wild || {}) }; S.arenaAt = a.updatedAt || 0;
   // Imports before the per-printing fix could count one card several times (once per printing), so ask for a fresh import
   S.arenaVer = a.v || (S.arena.size ? 1 : 2);
-}
-// Older versions matched token cards like "Goblin" to "_____ Goblin". Take those token copies back out (only ever finds them once).
-function fixBlankNameTokens(){
-  const bad = (S.prints || []).filter(p => /_/.test(p.name || "") && /^t[a-z0-9]{3,4}$/.test(p.set || ""));
-  if (bad.length) {
-    for (const p of bad) {
-      const i = lookup(p.name); if (i < 0) continue;
-      const left = (S.coll.get(i) || 0) - (p.qty || 1);
-      if (left > 0) S.coll.set(i, left); else S.coll.delete(i);
-    }
-    S.prints = S.prints.filter(p => !bad.includes(p)); savePrints();
-    S.updatedAt = Date.now(); persistCollection();
-    try { const c = syncCfg(); if (c.token) { c.dirty = true; saveSyncCfg(c); } } catch {}
-  }
 }
 function saveArena(){
   const items = {}; for (const [i, q] of S.arena) items[card(i)[C.name]] = q;
