@@ -1,7 +1,31 @@
 {
- "updated": "2026-11-09T14:32Z",
+ "updated": "2026-11-10T18:50Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
+  {
+   "title": "MTG Arena Announcements – November 9, 2026",
+   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-9-2026",
+   "section": "Mtg Arena",
+   "date": "2026-11-09",
+   "summary": "Catch up with the latest info and events on MTG Arena.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
+  },
+  {
+   "title": "Arena Direct for Magic: The Gathering® | Star Trek™, November 13–22",
+   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
+   "section": "Mtg Arena",
+   "date": "2026-11-09",
+   "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/5ye1RVxuozis9FYm69XfZC/ee892c896349e73422f715e519cd3153/TRK-1614A_TYSIEKCG_1920x1080_Static_Clean_EN_00000.png"
+  },
+  {
+   "title": "Design Files: Fifth Dawn, Part 2",
+   "url": "https://magic.wizards.com/en/news/making-magic/design-files-fifth-dawn-part-2",
+   "section": "Making Magic",
+   "date": "2026-11-09",
+   "summary": "Mark continues his Fifth Dawn \"Design Files\" series with part two, this time picking up at red cards.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/4Jrlxh9d4LpQt6wOmK8TBl/c86b092f47e83ca404bfa4b34c92bf6e/75386_Cosmic_Larva_Jeff_Easley.webp"
+  },
   {
    "title": "Magic: The Gathering® | Star Trek™ Update Bulletin",
    "url": "https://magic.wizards.com/en/news/announcements/star-trek-update-bulletin",
@@ -35,28 +59,12 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/4IEBnwtcjHLfYmUQbquLm5/a22bb168597549664ba5ac16fb443a18/TRK-8001_IJNBTYDE_1920x1080_02.webp"
   },
   {
-   "title": "MTG Arena Announcements – November 2, 2026",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-2-2026",
-   "section": "Mtg Arena",
-   "date": "2026-11-02",
-   "summary": "Catch up with the latest info and events on MTG Arena.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
-  },
-  {
-   "title": "Arena Direct for Edge of Eternities, November 6–8",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
-   "section": "Mtg Arena",
-   "date": "2026-11-02",
-   "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/4548Mm6rmgllCfkix74mqQ/488d5e9ac176e62d2b989a832fb074f0/Wiz-LO_2765O_C13_EOEArenaDirectPlayBooster2_1920x1080_Video_VarB_V01_00539.webp"
-  },
-  {
-   "title": "Arena Direct | Terms and Conditions",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct-terms-and-conditions",
-   "section": "Mtg Arena",
-   "date": "2026-11-02",
-   "summary": "These Arena Direct Official Terms and Conditions govern your participation in the MTG Arena organized play Arena Direct events",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/3ZKFVCed6Sa7m5z1QRyebE/9213e31e5020389cdfd47d2522a3a72d/MTGA_News_Icon.jpg"
+   "title": "Magic: The Gathering® | Star Trek™ Release Notes",
+   "url": "https://magic.wizards.com/en/news/feature/star-trek-release-notes",
+   "section": "Feature",
+   "date": "2026-10-30",
+   "summary": "The Release Notes include info about the release of a new set, as well as clarifications and rulings involving that set's cards.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/6JZIWQVKMPBg3iz0JZhSbn/1d33334574c0d1862f941a33fdc35a8c/TRK-8001_IJNBTYDE_1920x1080_14.webp"
   },
   {
    "title": "Magic: The Gathering® | Star Trek™ Prerelease Guide",
@@ -75,14 +83,6 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/5jeHhwEeoBxfzDJVzyB7R9/27f6ebf0627d5c189d44a1e2874b4dac/TRK_Dr._Leonard_Bones_McCoy.webp"
   },
   {
-   "title": "Magic: The Gathering® | Star Trek™ Release Notes",
-   "url": "https://magic.wizards.com/en/news/feature/star-trek-release-notes",
-   "section": "Feature",
-   "date": "2026-10-30",
-   "summary": "The Release Notes include info about the release of a new set, as well as clarifications and rulings involving that set's cards.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/6JZIWQVKMPBg3iz0JZhSbn/1d33334574c0d1862f941a33fdc35a8c/TRK-8001_IJNBTYDE_1920x1080_14.webp"
-  },
-  {
    "title": "Magic: The Gathering® | Star Trek™ Commander Decklists",
    "url": "https://magic.wizards.com/en/news/announcements/star-trek-commander-decklists",
    "section": "Announcements",
@@ -91,12 +91,12 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/2dmvMR90kZ4WQ2dtHnt7XD/2b2c69701fc5b6302d85b5427a915114/TRK_Austere_Command_1920x1080.webp"
   },
   {
-   "title": "Secret Lair: Set Phasers to Superdrop",
-   "url": "https://magic.wizards.com/en/news/announcements/secret-lair-set-phasers-to-superdrop",
-   "section": "Announcements",
-   "date": "2026-10-27",
-   "summary": "Secret Lair heads to the final frontier with Set Phasers to Superdrop! Join the crew when these drops launch on November 9, 2026!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/72jGcT27tOO9EbDMcIXqYW/f146b47fea73e091dc871cbfe64792b2/SL_Star_Trek_1920x1080.webp"
+   "title": "Where to Play Magic: The Gathering® | Star Trek™",
+   "url": "https://magic.wizards.com/en/news/feature/where-to-play-star-trek",
+   "section": "Feature",
+   "date": "2026-10-28",
+   "summary": "From Prerelease events to Magic Spotlight: Star Trek and everything in between, players worldwide can explore the acclaimed sci-fi classic through a multitude of Magic play experiences.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/6tAT2cu2tH54u8VL634so5/f755169e8a2f6ff587b23d6a0070327e/TRK-8001_IJNBTYDE_1920x1080_13.webp"
   },
   {
    "title": "Collecting Magic: The Gathering® | Star Trek™",
@@ -105,6 +105,14 @@
    "date": "2026-10-20",
    "summary": "The final frontier awaits in Magic: The Gathering | Star Trek. Here's everything you need to know about collecting the set before it releases on November 13.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/4Fzit8whD4Val9xUYDeo2a/5fb416bdb12f43740d0227e53e2ac859/TRK_USS_Enterprise_D_960x540.jpg"
+  },
+  {
+   "title": "Magic: The Gathering® | Star Trek™ Mechanics",
+   "url": "https://magic.wizards.com/en/news/feature/star-trek-mechanics",
+   "section": "Feature",
+   "date": "2026-10-20",
+   "summary": "Star Trek and Magic have delighted fans for decades. See how these engaging worlds have merged through the mechanics of Magic: The Gathering | Star Trek.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/6KjTcxgdcFlC7Sr1RJrTJZ/9c8a7451ee0c0ed78f30b0fbb19489e1/TRK_Captain_Benjamin_Sisko_1920x1080.webp"
   }
  ]
 }
