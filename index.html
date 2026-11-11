@@ -188,6 +188,11 @@ button.mini{min-height:32px;padding:2px 10px}
 .combo:last-child{border-bottom:0}
 .cpills{display:flex;flex-wrap:wrap;gap:4px}
 .foldtitle{font-family:var(--display);font-size:1.35rem}
+.chatlog{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.chatmsg{padding:10px 12px;border-radius:12px;background:var(--sunk);max-width:100%;overflow-wrap:anywhere}
+.chatmsg.me{align-self:flex-end;background:color-mix(in srgb,var(--accent) 18%,var(--surface));max-width:88%}
+.chatmsg p{margin:0 0 6px}.chatmsg p:last-child{margin:0}.chatmsg ul{margin:4px 0}
+.chatswaps{margin-top:8px;border-top:1px solid var(--line);padding-top:4px}
 .newsitem{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start;text-decoration:none;color:var(--fg);padding:12px 0;border-top:1px solid var(--line)}
 .newsitem:first-child{border-top:0}
 .newsitem img{width:96px;height:64px;object-fit:cover;border-radius:6px;background:var(--sunk)}
@@ -1720,6 +1725,8 @@ function renderDeck(){
   <div class="panel">
     <div class="row" style="justify-content:space-between"><h3>Claude's take</h3><button class="${d.eval ? "ghost" : "primary"} mini" id="evalDeckBtn" data-claude>${d.eval ? "Evaluate again" : "Evaluate with Claude"}</button></div>
     <div id="deckEval">${d.eval ? "" : `<p class="small muted">Get a rating, strengths and weaknesses, how to play it, swaps from cards you own, and the upgrades most worth buying.</p>`}</div>
+    <details class="subfold" id="deckChatFold" ${(d.chat || []).length ? "open" : ""}><summary><b>Talk it through</b> <span class="small muted">${(d.chat || []).length ? `${Math.ceil(d.chat.length / 2)} message${d.chat.length > 2 ? "s" : ""}` : "ask Claude about this deck"}</span></summary>
+      <div id="deckChat"></div></details>
   </div>
   <div class="panel">
     <div class="row" style="justify-content:space-between"><h3>Mana curve</h3><span class="small muted">${COLORS.filter(x => pipsCount[x]).map(x => `<span class="pip ${x}"></span><span class="num">${pipsCount[x]}</span>`).join(" ") || "Colorless"}</span></div>
@@ -1780,6 +1787,7 @@ function renderDeck(){
   if ($("#budgetBtn")) $("#budgetBtn").onclick = () => budgetUpgrade(d);
   $("#evalDeckBtn").onclick = () => evaluateSavedDeck(d);
   if (d.eval) renderDeckEval(d);
+  renderDeckChat(d);
   if ($("#deckBracketBtn")) $("#deckBracketBtn").onclick = () => bracketPanel($("#deckBracket"), deckEntries(d).filter(([n]) => n !== d.commander), d.commander, d.format, d.id);
   $("#shareBtn").onclick = () => shareDeck(d);
   $("#archBtn").onclick = () => copyText(archidektText(d), $("#archBtn"), $("#shareOut"));
@@ -2660,6 +2668,37 @@ function renderRecords(){
 }
 
 /* ================= Claude's take on any deck ================= */
+// Everything Claude needs to talk about a deck: the list with card text, and the spare cards it could use
+function deckContext(d){
+  const f = FMT[d.format] || FMT.casual, ident = d.commander ? (d.identity || card(lookup(d.commander))[C.id]) : "";
+  const entries = deckEntries(d).concat(Object.entries(d.basics || {}));
+  const inDeck = new Set(entries.map(([n]) => n));
+  const deckLines = entries.map(([n, q]) => { const i = lookup(n); if (i < 0) return `${q}|${n}`; const c = card(i), t = c[C.text].length > 150 ? c[C.text].slice(0, 147) + "…" : c[C.text];
+    return `${q}|${c[0]}|${c[1]}|${c[3]}|${c[7]}|${t}${n === d.commander ? "|COMMANDER" : ""}`; });
+  const used = useMap(d.id), words = themeWords(entries.map(([n]) => { const i = lookup(n); return i >= 0 ? card(i)[C.type] + " " + card(i)[C.text] : ""; }).join(" ")).slice(0, 40);
+  const pool = [];
+  for (const [i, q] of (d.arena ? S.arena : S.coll)) {
+    const c = card(i); if (inDeck.has(c[C.name]) || isBasic(c)) continue;
+    const spare = q - (d.arena ? 0 : (used.get(c[C.name])?.q || 0)); if (spare <= 0) continue;
+    if (d.format !== "casual" && !legalIn(c, d.format)) continue;
+    if (d.commander && ![...c[C.id]].every(x => ident.includes(x))) continue;
+    pool.push({ i, q:spare, s:score(c, words) });
+  }
+  pool.sort((a, b) => b.s - a.s);
+  return { f, ident, entries, inDeck, deckLines, pool };
+}
+// Keep only swaps that are real: the card going out is in the deck, the card coming in is a spare you own
+function cleanSwaps(d, list, inDeck, pool){
+  const spareOf = new Map(pool.map(p => [card(p.i)[C.name], p.q])), taken = new Map(), swaps = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    const oi = lookup(x?.out), ii = lookup(x?.in); if (oi < 0 || ii < 0) continue;
+    const out = card(oi)[C.name], inn = card(ii)[C.name];
+    if (!inDeck.has(out) || out === d.commander || !spareOf.has(inn) || (taken.get(inn) || 0) >= spareOf.get(inn) || swaps.some(s2 => s2.out === out)) continue;
+    taken.set(inn, (taken.get(inn) || 0) + 1);
+    swaps.push({ out, in:inn, why:String(x.why || "") });
+  }
+  return swaps;
+}
 async function evaluateSavedDeck(d){
   const box = $("#deckEval");
   if (!S.sample) return showKeyNeeded("#deckEval");
@@ -2731,6 +2770,118 @@ ${alts.join("\n") || "(none)"}`;
     if ($("#evalDeckBtn")) $("#evalDeckBtn").disabled = false;
   }
 }
+async function applySwapList(d, picks){
+  for (const s2 of picks) {
+    s2.applied = true;
+    const o = d.cards.find(c => c.name === s2.out); if (o) o.qty -= 1; else if ((d.basics || {})[s2.out] > 0) d.basics[s2.out] -= 1;
+    const ex = d.cards.find(c => c.name === s2.in); if (ex) ex.qty += 1; else d.cards.push({ name:s2.in, qty:1, role:"swap" });
+  }
+  d.cards = d.cards.filter(c => c.qty > 0);
+  d.total = d.cards.reduce((a, c) => a + c.qty, 0) + Object.values(d.basics || {}).reduce((a, q) => a + q, 0) + (d.commander ? 1 : 0);
+  d._note = `Claude's swaps (${picks.length})`;
+  S.current = d; if (d.saved) await saveDeck(d); else recentPut(d);
+  renderDeck();
+}
+const swapDoneNote = (d, n) => `<div class="notice ok">Swapped ${n} card${n === 1 ? "" : "s"}.${d.arena ? " Copy it for Arena again to update the deck there." : d.built ? " Pull the new cards from your collection and put the old ones away." : ""}</div>`;
+const swapIsStale = (d, s2) => s2.applied || (!(d.cards || []).some(c => c.name === s2.out) && !((d.basics || {})[s2.out] > 0));
+
+/* ---------- talk about a deck with Claude ----------
+   The conversation is saved with the deck (so it syncs). Claude sees the deck, your spare cards and its last
+   review; when it recommends concrete swaps they come back as tickable rows, same as the review's. */
+function mdLite(t){
+  return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split(/\n{2,}/).map(par => {
+    const lines = par.split("\n");
+    if (lines.every(l => /^\s*([-*•]|\d+[.)])\s+/.test(l))) return `<ul class="tight">${lines.map(l => `<li>${l.replace(/^\s*([-*•]|\d+[.)])\s+/, "")}</li>`).join("")}</ul>`;
+    return `<p>${lines.join("<br>")}</p>`;
+  }).join("");
+}
+function renderDeckChat(d){
+  const box = $("#deckChat"); if (!box) return;
+  const msgs = d.chat || [];
+  box.innerHTML = `${msgs.length ? `<div class="chatlog">${msgs.map((m, k) => m.role === "user"
+      ? `<div class="chatmsg me">${mdLite(m.text)}</div>`
+      : `<div class="chatmsg">${mdLite(m.text)}${(m.swaps || []).length ? `<div class="chatswaps">${m.swaps.map((s2, j) => { const done = swapIsStale(d, s2);
+          return `<label class="pullrow ${done ? "done" : ""}"><input type="checkbox" data-csw="${k}.${j}" ${done ? "disabled" : "checked"}><span><span class="need">${esc(s2.out)}</span> → <span class="have">${esc(s2.in)}</span>${cmpBtn(s2.out, s2.in, s2.why)}${s2.why ? `<br><span class="small muted">${esc(s2.why)}</span>` : ""}</span></label>`; }).join("")}
+          ${m.swaps.some(s2 => !swapIsStale(d, s2)) ? `<div class="row" style="margin-top:6px"><button class="primary grow" data-capply="${k}">Apply ticked swaps</button></div>` : ""}</div>` : ""}</div>`).join("")}</div>` : ""}
+    <div id="deckChatBusy"></div>
+    <div class="field" style="margin-top:8px"><label class="label" for="deckChatIn">${msgs.length ? "Reply" : "Ask about this deck"}</label>
+      <textarea id="deckChatIn" rows="2" placeholder="${msgs.length ? "Ask a follow-up" : "I use Erode on my own tokens to fetch lands. Does that change anything?"}"></textarea></div>
+    <div class="row btnrow"><button class="primary grow" id="deckChatSend" data-claude>Send</button>${msgs.length ? `<button class="ghost" id="deckChatClear">Clear chat</button>` : ""}</div>
+    <div id="deckChatMsg"></div>`;
+  $("#deckChatSend").onclick = () => sendDeckChat(d);
+  $("#deckChatIn").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendDeckChat(d); } });
+  if ($("#deckChatClear")) $("#deckChatClear").onclick = () => { if (!confirmTap($("#deckChatClear"), "Tap again to clear")) return; d.chat = []; if (d.saved) LS.set("dw.decks", S.decks); renderDeckChat(d); };
+  box.querySelectorAll("[data-capply]").forEach(b => b.onclick = async () => {
+    const k = +b.dataset.capply, m = d.chat[k];
+    const picks = [...box.querySelectorAll(`[data-csw^="${k}."]:checked`)].map(x => m.swaps[+x.dataset.csw.split(".")[1]]);
+    if (!picks.length) return;
+    await applySwapList(d, picks);
+    $("#deckChatMsg") && ($("#deckChatMsg").innerHTML = swapDoneNote(d, picks.length));
+  });
+}
+// tap once to arm, again to do it (no browser dialogs)
+function confirmTap(btn, label){
+  if (btn.dataset.armed) return true;
+  btn.dataset.armed = "1"; const was = btn.textContent; btn.textContent = label;
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = was; } }, 3000);
+  return false;
+}
+async function sendDeckChat(d){
+  const inp = $("#deckChatIn"), text = (inp?.value || "").trim(); if (!text) return;
+  if (!S.sample) return showKeyNeeded("#deckChatBusy");
+  const { f, ident, inDeck, deckLines, pool, entries } = deckContext(d);
+  const alts = []; let used2 = 0;
+  for (const p of pool) { const l = lineFor(p.i, p.q); if (used2 + l.length > 40000) break; used2 += l.length + 1; alts.push(l); }
+  const ev = d.eval, total = d.total || entries.reduce((a, [, q]) => a + (+q || 0), 0);
+  const system = `You are an expert Magic: The Gathering player talking with the player about one of their decks, in the Deckwright app. Be friendly, direct and concise (usually under 200 words), like a knowledgeable friend. Use plain text: short paragraphs, "- " bullet lists and **bold** are fine; no headings or tables.
+Treat the player's own play patterns and tricks as real information (e.g. "I target my own tokens with Erode to fetch a land") and update your advice to fit them. If you don't know a card, say so or use the card_info tool rather than guessing its text.
+
+DECK: ${d.name} · ${f.label}${d.arena ? " on MTG Arena" : " (paper)"} · ${total} cards${d.commander ? ` · commander ${d.commander} (colour identity ${ident || "colorless"})` : ""}
+${!isCmdFmt(d.format) && d.format !== "casual" ? `The format minimum is 60 with no maximum${d.arena ? " (Arena allows up to 250)" : ""}; the player chose this size on purpose.
+` : ""}${d.gameplan ? `Player's notes/gameplan: ${d.gameplan}
+` : ""}${ev ? `Your earlier review (${new Date(ev.at).toLocaleDateString()}): ${ev.rating}/10. ${ev.verdict} Weaknesses: ${ev.weaknesses.join("; ")}
+` : ""}
+SWAPS: when you recommend specific changes, you may only swap in cards from SPARE CARDS below (${d.arena ? "cards the player owns on Arena" : "cards the player owns that aren't in another built deck"}), one copy out for one copy in. After your message, add the swaps in this exact form on its own lines:
+<swaps>[{"out":"Card In Deck","in":"Spare Card","why":"short reason"}]</swaps>
+Only include swaps the player would want to apply. Cards the player doesn't own can be mentioned in text as ${d.arena ? "crafting" : "buying"} ideas, never in <swaps>.
+
+DECK (qty|name|cost|type|P/T|text):
+${deckLines.join("\n")}
+
+SPARE CARDS (spare copies|name|cost|type|P/T|text):
+${alts.join("\n") || "(none)"}`;
+  d.chat = d.chat || [];
+  d.chat.push({ role:"user", text, at:Date.now() });
+  inp.value = "";
+  renderDeckChat(d);
+  const busy = $("#deckChatBusy"), ctl = new AbortController();
+  busy.innerHTML = `<div class="progress" style="margin-top:8px"><div class="spin"></div><div class="grow"><b>Claude is thinking</b></div><button class="ghost" id="deckChatStop">Stop</button></div>`;
+  $("#deckChatStop").onclick = () => ctl.abort();
+  $("#deckChatSend").disabled = true;
+  const history = d.chat.slice(-16).map(m => ({ role:m.role, content:m.role === "assistant" && m.swaps?.length ? m.text + "\n<swaps>" + JSON.stringify(m.swaps.map(({ out, in:inn, why }) => ({ out, in:inn, why }))) + "</swaps>" : m.text }));
+  while (history.length && history[0].role !== "user") history.shift();
+  const tools = [{ name:"card_info", description:"Look up a Magic card's exact rules text, and whether the player owns it and how many copies.",
+    inputSchema:{ type:"object", properties:{ name:{ type:"string", description:"Exact card name" } }, required:["name"] },
+    execute: async ({ name }) => { const i = lookup(name); if (i < 0) return `No card named "${name}" in the card data.`; const c = card(i);
+      const own = (d.arena ? S.arena : S.coll).get(i) || 0;
+      return `${c[C.name]} ${c[C.cost]} | ${c[C.type]}${c[C.pt] ? " | " + c[C.pt] : ""}\n${c[C.text]}\nOwned${d.arena ? " on Arena" : ""}: ${own}${d.format !== "casual" ? ` · legal in ${f.label}: ${legalIn(c, d.format) ? "yes" : "no"}` : ""}`; } }];
+  try {
+    const r = await S.sample.chat(system, history, { modelTier:"default", signal:ctl.signal, maxTokens:3000, tools });
+    let reply = String(r.text || "").trim(), swaps = [];
+    const m = reply.match(/<swaps>\s*([\s\S]*?)\s*<\/swaps>/i);
+    if (m) { try { swaps = cleanSwaps(d, parseLooseJSON(m[1]), inDeck, pool); } catch {} reply = reply.replace(m[0], "").trim(); }
+    d.chat.push({ role:"assistant", text:reply || "(no reply)", swaps, at:Date.now() });
+    if (d.chat.length > 40) d.chat = d.chat.slice(-40);
+    if (d.saved) LS.set("dw.decks", S.decks);
+    renderDeckChat(d);
+    const log = $("#deckChat .chatlog"); log?.lastElementChild?.scrollIntoView({ block:"nearest" });
+  } catch (e) {
+    d.chat.pop();   // didn't get an answer, so leave the question in the box to try again
+    renderDeckChat(d); $("#deckChatIn").value = text;
+    if (e?.code !== "cancelled") $("#deckChatMsg").innerHTML = `<div class="notice bad">${esc(errText(e))}</div>`;
+  }
+}
+
 function renderDeckEval(d){
   const ev = d.eval, box = $("#deckEval"); if (!ev || !box) return;
   const stale = ev.swaps.filter(s2 => s2.applied || (!(d.cards || []).some(c => c.name === s2.out) && !((d.basics || {})[s2.out] > 0)));
@@ -2748,17 +2899,8 @@ function renderDeckEval(d){
   if ($("#applySwaps")) $("#applySwaps").onclick = async () => {
     const picks = [...box.querySelectorAll("[data-sw]:checked")].map(x => ev.swaps[+x.dataset.sw]);
     if (!picks.length) return;
-    for (const s2 of picks) {
-      s2.applied = true;
-      const o = d.cards.find(c => c.name === s2.out); if (o) o.qty -= 1; else if ((d.basics || {})[s2.out] > 0) d.basics[s2.out] -= 1;
-      const ex = d.cards.find(c => c.name === s2.in); if (ex) ex.qty += 1; else d.cards.push({ name:s2.in, qty:1, role:"swap" });
-    }
-    d.cards = d.cards.filter(c => c.qty > 0);
-    d.total = d.cards.reduce((a, c) => a + c.qty, 0) + Object.values(d.basics || {}).reduce((a, q) => a + q, 0) + (d.commander ? 1 : 0);
-    d._note = `Claude's swaps (${picks.length})`;
-    S.current = d; if (d.saved) await saveDeck(d); else recentPut(d);
-    renderDeck();
-    $("#deckEvalMsg") && ($("#deckEvalMsg").innerHTML = `<div class="notice ok">Swapped ${picks.length} card${picks.length === 1 ? "" : "s"}.${d.arena ? " Copy it for Arena again to update the deck there." : d.built ? " Pull the new cards from your collection and put the old ones away." : ""}</div>`);
+    await applySwapList(d, picks);
+    $("#deckEvalMsg") && ($("#deckEvalMsg").innerHTML = swapDoneNote(d, picks.length));
   };
   if ($("#evalWish")) $("#evalWish").onclick = () => { const n = addToWish(ev.buys.map(b => [b.name, 1])); $("#deckEvalMsg").innerHTML = `<div class="notice ok">Added ${n} card${n === 1 ? "" : "s"} to your wishlist.</div>`; };
 }
@@ -4277,10 +4419,12 @@ function makeSampler(key){
     const tools = pageTools.map(t => ({ name:t.name, description:t.description, input_schema:t.inputSchema || { type:"object", properties:{} } }));
     // the big prompt is cached so each validation round only pays a fraction for it
     const imgs = (opts.images || []).map(im => ({ type:"image", source:{ type:"base64", media_type:im.media_type, data:im.data } }));
-    const messages = [{ role:"user", content:[...imgs, { type:"text", text:prompt, cache_control:{ type:"ephemeral" } }] }];
+    const messages = opts.messages ? opts.messages.map(m => ({ role:m.role, content:m.content }))
+      : [{ role:"user", content:[...imgs, { type:"text", text:prompt, cache_control:{ type:"ephemeral" } }] }];
     const MAX_ROUNDS = 6;
     for (let round = 0; ; round++) {
-      const body = { model, max_tokens:16000, messages };
+      const body = { model, max_tokens:opts.maxTokens || 16000, messages };
+      if (opts.system) body.system = [{ type:"text", text:opts.system, cache_control:{ type:"ephemeral" } }];
       if (tools.length) { body.tools = tools; if (round >= MAX_ROUNDS - 1) body.tool_choice = { type:"none" }; }
       const data = await callAPI(key, body, opts.signal);
       const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
@@ -4305,6 +4449,8 @@ function makeSampler(key){
     if (r.truncated) throw { code:"invalid_json", text:r.text };
     return parseLooseJSON(r.text);
   };
+  // a conversation: system holds the long context (cached), messages are the back-and-forth
+  sample.chat = (system, messages, o = {}) => run("", { ...o, system, messages });
   sample.limits = async () => ({ tools:{ maxCount:8 } });
   return sample;
 }
