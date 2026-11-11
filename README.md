@@ -2,7 +2,7 @@
 
 Build Magic: The Gathering decks from the paper cards you own.
 
-- Import a ManaBox CSV export of your collection.
+- Import a Collection CSV export of your collection.
 - **Build**: Claude builds Commander, Standard, Pioneer, Modern, Legacy or casual decks using only your cards.
 - **Check**: paste any decklist to see what you own, what you still need, and get stand-ins from your collection.
 - Works offline once installed (Claude, card pictures and card updates need a connection).
