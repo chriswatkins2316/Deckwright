@@ -1,14 +1,14 @@
 {
- "updated": "2026-11-12T19:08Z",
+ "updated": "2026-11-13T18:45Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
   {
-   "title": "MTG Arena Announcements – November 9, 2026",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-9-2026",
-   "section": "Mtg Arena",
-   "date": "2026-11-09",
-   "summary": "Catch up with the latest info and events on MTG Arena.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
+   "title": "Artist Credit Update",
+   "url": "https://magic.wizards.com/en/news/announcements/artist-credit-update",
+   "section": "Announcements",
+   "date": "2026-11-12",
+   "summary": "A statement on the artist credit for the LCARS version of There's Coffee in that Nebula from Magic: The Gathering® | Star Trek™.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/3wrH9sBKHglWfyp2yMOAgu/0708940b4f36cd9d08e7f896f60386a0/new_default_wizards_icon_header.jpg"
   },
   {
    "title": "Arena Direct for Magic: The Gathering® | Star Trek™, November 13–22",
@@ -17,6 +17,14 @@
    "date": "2026-11-09",
    "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/5ye1RVxuozis9FYm69XfZC/ee892c896349e73422f715e519cd3153/TRK-1614A_TYSIEKCG_1920x1080_Static_Clean_EN_00000.png"
+  },
+  {
+   "title": "MTG Arena Announcements – November 9, 2026",
+   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-9-2026",
+   "section": "Mtg Arena",
+   "date": "2026-11-09",
+   "summary": "Catch up with the latest info and events on MTG Arena.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
   },
   {
    "title": "Design Files: Fifth Dawn, Part 2",
@@ -49,14 +57,6 @@
    "date": "2026-11-03",
    "summary": "Show your support for Extra Life with new merch, a Secret Lair drop, and more! It's time to level up our gaming community!",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/6Cj6ZFu7Ry4A1gJI8EBnRE/a4088d3658ca7dca49d1203d4be58271/Extra_Life_2026_1920x1080.webp"
-  },
-  {
-   "title": "Ad Astra Per Aspera",
-   "url": "https://magic.wizards.com/en/news/feature/ad-astra-per-aspera",
-   "section": "Feature",
-   "date": "2026-11-03",
-   "summary": "Creating Magic: The Gathering® | Star Trek™ was a monumental task. But for Senior Narrative Designer Crystal Frasier, it was also a celebration of everything amazing about the series—and we mean everything.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/4IEBnwtcjHLfYmUQbquLm5/a22bb168597549664ba5ac16fb443a18/TRK-8001_IJNBTYDE_1920x1080_02.webp"
   },
   {
    "title": "Magic: The Gathering® | Star Trek™ Prerelease Guide",
@@ -107,20 +107,20 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/72jGcT27tOO9EbDMcIXqYW/f146b47fea73e091dc871cbfe64792b2/SL_Star_Trek_1920x1080.webp"
   },
   {
-   "title": "Magic: The Gathering® | Star Trek™ Buyer's Guide",
-   "url": "https://magic.wizards.com/en/news/feature/star-trek-buyers-guide",
-   "section": "Feature",
-   "date": "2026-10-20",
-   "summary": "Looking for the perfect gift for a loved one or yourself? Navigate the cosmos with a captain's expertise using this handy guide to the cards and products of Magic: The Gathering | Star Trek!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/2p1LjQgWYhgC0rjhsxHIbn/2b19faf3ac1f056af687616c3e2b8605/TRK_Jean-Luc_Picard__Luminary_1920x1080.webp"
-  },
-  {
    "title": "Collecting Magic: The Gathering® | Star Trek™",
    "url": "https://magic.wizards.com/en/news/feature/collecting-star-trek",
    "section": "Feature",
    "date": "2026-10-20",
    "summary": "The final frontier awaits in Magic: The Gathering | Star Trek. Here's everything you need to know about collecting the set before it releases on November 13.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/4Fzit8whD4Val9xUYDeo2a/5fb416bdb12f43740d0227e53e2ac859/TRK_USS_Enterprise_D_960x540.jpg"
+  },
+  {
+   "title": "Magic: The Gathering® | Star Trek™ Buyer's Guide",
+   "url": "https://magic.wizards.com/en/news/feature/star-trek-buyers-guide",
+   "section": "Feature",
+   "date": "2026-10-20",
+   "summary": "Looking for the perfect gift for a loved one or yourself? Navigate the cosmos with a captain's expertise using this handy guide to the cards and products of Magic: The Gathering | Star Trek!",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/2p1LjQgWYhgC0rjhsxHIbn/2b19faf3ac1f056af687616c3e2b8605/TRK_Jean-Luc_Picard__Luminary_1920x1080.webp"
   }
  ]
 }
