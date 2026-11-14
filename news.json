@@ -1,7 +1,31 @@
 {
- "updated": "2026-11-13T18:45Z",
+ "updated": "2026-11-14T17:18Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
+  {
+   "title": "Collecting Nauctis: The Sunken Realm | A First Look",
+   "url": "https://magic.wizards.com/en/news/feature/collecting-nauctis-the-sunken-realm",
+   "section": "Feature",
+   "date": "2026-11-13",
+   "summary": "We breached the surface of Nauctis: The Sunken Realm at MagicCon: Atlanta! See what lies beneath the waves before the set releases on February 5, 2027.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/7lujIKXzBmD3KN7xmKR5EJ/ebd5b945abf64d2529661f3c5a143743/NAU_Salinae__the_Ocean_Mother_1920x1080.webp"
+  },
+  {
+   "title": "Planeswalker's Guide to Nauctis: The Sunken Realm",
+   "url": "https://magic.wizards.com/en/news/magic-story/planeswalkers-guide-to-nauctis-the-sunken-realm",
+   "section": "Magic Story",
+   "date": "2026-11-13",
+   "summary": "Explore Nauctis, a plane of endless ocean, from the merfolk of the Grand Marine to the desolators rising from the Abyss. You can follow the story of Nauctis: The Sunken Realm when the first episode arrives on January 4, 2027.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/3g0BJRJkK58qdhaP6aI1KL/e4195c66f630022f51656b857eef1194/NAU_PWG_1920x1080.webp"
+  },
+  {
+   "title": "Netflix Reveals Magic: The Gathering Animated Series PLANESWALKER",
+   "url": "https://magic.wizards.com/en/news/announcements/netflix-reveals-magic-the-gathering-animated-series-planeswalker",
+   "section": "Announcements",
+   "date": "2026-11-13",
+   "summary": "Step into the worlds of PLANESWALKER and meet the people who will shape them. Every great story begins with a spark. Here's your first look at PLANESWALKER, based on Magic: The Gathering. Coming to Netflix in 2027.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/L8M1wBB2xzbT4ArIrtyNc/c15395b81b0728f0267a36db03d304e7/Netflix_Planeswalker_VOD.webp"
+  },
   {
    "title": "Artist Credit Update",
    "url": "https://magic.wizards.com/en/news/announcements/artist-credit-update",
@@ -43,22 +67,6 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/2iLXHllTRF1VcG5z5YkwRM/b5a86c67c4d57a2be3e7961588fcf365/TRK_Professional_Face-Breaker_1920x1080.webp"
   },
   {
-   "title": "IDIC: Infinite Diversity in Infinite Combinations",
-   "url": "https://magic.wizards.com/en/news/feature/idic-infinite-diversity-in-infinite-combinations",
-   "section": "Feature",
-   "date": "2026-11-04",
-   "summary": "Beyond influencing Vulcan philosophy, IDIC was a guiding principle in the design and development of Magic: The Gathering® | Star Trek™.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/1swzRMkyZPhKTTUH9JAX5k/cfc13e09371565b383025c4118f75ae3/TRK-8001_IJNBTYDE_1920x1080_10.webp"
-  },
-  {
-   "title": "Magic Levels Up with Extra Life for 2026",
-   "url": "https://magic.wizards.com/en/news/announcements/magic-levels-up-with-extra-life-for-2026",
-   "section": "Announcements",
-   "date": "2026-11-03",
-   "summary": "Show your support for Extra Life with new merch, a Secret Lair drop, and more! It's time to level up our gaming community!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/6Cj6ZFu7Ry4A1gJI8EBnRE/a4088d3658ca7dca49d1203d4be58271/Extra_Life_2026_1920x1080.webp"
-  },
-  {
    "title": "Magic: The Gathering® | Star Trek™ Prerelease Guide",
    "url": "https://magic.wizards.com/en/news/feature/star-trek-prerelease-guide",
    "section": "Feature",
@@ -91,14 +99,6 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/2dmvMR90kZ4WQ2dtHnt7XD/2b2c69701fc5b6302d85b5427a915114/TRK_Austere_Command_1920x1080.webp"
   },
   {
-   "title": "Where to Play Magic: The Gathering® | Star Trek™",
-   "url": "https://magic.wizards.com/en/news/feature/where-to-play-star-trek",
-   "section": "Feature",
-   "date": "2026-10-28",
-   "summary": "From Prerelease events to Magic Spotlight: Star Trek and everything in between, players worldwide can explore the acclaimed sci-fi classic through a multitude of Magic play experiences.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/6tAT2cu2tH54u8VL634so5/f755169e8a2f6ff587b23d6a0070327e/TRK-8001_IJNBTYDE_1920x1080_13.webp"
-  },
-  {
    "title": "Secret Lair: Set Phasers to Superdrop",
    "url": "https://magic.wizards.com/en/news/announcements/secret-lair-set-phasers-to-superdrop",
    "section": "Announcements",
@@ -113,14 +113,6 @@
    "date": "2026-10-20",
    "summary": "The final frontier awaits in Magic: The Gathering | Star Trek. Here's everything you need to know about collecting the set before it releases on November 13.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/4Fzit8whD4Val9xUYDeo2a/5fb416bdb12f43740d0227e53e2ac859/TRK_USS_Enterprise_D_960x540.jpg"
-  },
-  {
-   "title": "Magic: The Gathering® | Star Trek™ Buyer's Guide",
-   "url": "https://magic.wizards.com/en/news/feature/star-trek-buyers-guide",
-   "section": "Feature",
-   "date": "2026-10-20",
-   "summary": "Looking for the perfect gift for a loved one or yourself? Navigate the cosmos with a captain's expertise using this handy guide to the cards and products of Magic: The Gathering | Star Trek!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/2p1LjQgWYhgC0rjhsxHIbn/2b19faf3ac1f056af687616c3e2b8605/TRK_Jean-Luc_Picard__Luminary_1920x1080.webp"
   }
  ]
 }
