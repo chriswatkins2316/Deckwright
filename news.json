@@ -1,7 +1,23 @@
 {
- "updated": "2026-11-15T17:58Z",
+ "updated": "2026-11-16T21:14Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
+  {
+   "title": "Design Files: Fifth Dawn, Part 3",
+   "url": "https://magic.wizards.com/en/news/making-magic/design-files-fifth-dawn-part-3",
+   "section": "Making Magic",
+   "date": "2026-11-16",
+   "summary": "Mark continues his look through the design files of Fifth Dawn, picking up where he left off at common noncreature artifacts.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/6RdHay1gHGJaRxQxhNZJ5e/ff5c9837855b8bfb8a8213f5456ae8e5/5DN_Krark-Clan_Ironworks_1920x1080.webp"
+  },
+  {
+   "title": "MTG Arena Announcements – November 16, 2026",
+   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-16-2026",
+   "section": "Mtg Arena",
+   "date": "2026-11-16",
+   "summary": "Catch up with the latest info and events on MTG Arena.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
+  },
   {
    "title": "Everything New for Competitive Play in 2027",
    "url": "https://magic.wizards.com/en/news/announcements/everything-new-for-competitive-play-in-2027",
@@ -43,28 +59,20 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/3wrH9sBKHglWfyp2yMOAgu/0708940b4f36cd9d08e7f896f60386a0/new_default_wizards_icon_header.jpg"
   },
   {
-   "title": "Arena Direct for Magic: The Gathering® | Star Trek™, November 13–22",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
-   "section": "Mtg Arena",
-   "date": "2026-11-09",
-   "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/5ye1RVxuozis9FYm69XfZC/ee892c896349e73422f715e519cd3153/TRK-1614A_TYSIEKCG_1920x1080_Static_Clean_EN_00000.png"
-  },
-  {
-   "title": "MTG Arena Announcements – November 9, 2026",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-9-2026",
-   "section": "Mtg Arena",
-   "date": "2026-11-09",
-   "summary": "Catch up with the latest info and events on MTG Arena.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
-  },
-  {
    "title": "Magic: The Gathering® | Star Trek™ Update Bulletin",
    "url": "https://magic.wizards.com/en/news/announcements/star-trek-update-bulletin",
    "section": "Announcements",
    "date": "2026-11-06",
    "summary": "Read all about the rules changes and updates arriving with Magic: The Gathering | Star Trek.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/2iLXHllTRF1VcG5z5YkwRM/b5a86c67c4d57a2be3e7961588fcf365/TRK_Professional_Face-Breaker_1920x1080.webp"
+  },
+  {
+   "title": "Magic Levels Up with Extra Life for 2026",
+   "url": "https://magic.wizards.com/en/news/announcements/magic-levels-up-with-extra-life-for-2026",
+   "section": "Announcements",
+   "date": "2026-11-03",
+   "summary": "Show your support for Extra Life with new merch, a Secret Lair drop, and more! It's time to level up our gaming community!",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/6Cj6ZFu7Ry4A1gJI8EBnRE/a4088d3658ca7dca49d1203d4be58271/Extra_Life_2026_1920x1080.webp"
   },
   {
    "title": "Magic: The Gathering® | Star Trek™ Prerelease Guide",
@@ -97,14 +105,6 @@
    "date": "2026-10-29",
    "summary": "Bring the voyages and stories of Star Trek to your Commander games with four ready-to-play decks featuring the Federation, Klingons, Borg, and more!",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/2dmvMR90kZ4WQ2dtHnt7XD/2b2c69701fc5b6302d85b5427a915114/TRK_Austere_Command_1920x1080.webp"
-  },
-  {
-   "title": "Secret Lair: Set Phasers to Superdrop",
-   "url": "https://magic.wizards.com/en/news/announcements/secret-lair-set-phasers-to-superdrop",
-   "section": "Announcements",
-   "date": "2026-10-27",
-   "summary": "Secret Lair heads to the final frontier with Set Phasers to Superdrop! Join the crew when these drops launch on November 9, 2026!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/72jGcT27tOO9EbDMcIXqYW/f146b47fea73e091dc871cbfe64792b2/SL_Star_Trek_1920x1080.webp"
   },
   {
    "title": "Collecting Magic: The Gathering® | Star Trek™",
