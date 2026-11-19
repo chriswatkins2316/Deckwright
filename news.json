@@ -1,7 +1,15 @@
 {
- "updated": "2026-11-18T19:35Z",
+ "updated": "2026-11-19T19:37Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
+  {
+   "title": "Magic Rules Blog: Mana Abilities",
+   "url": "https://magic.wizards.com/en/news/feature/magic-rules-blog-mana-abilities",
+   "section": "Feature",
+   "date": "2026-11-19",
+   "summary": "Learn why the Rules Management team updated what counts as a mana ability and how the change affects cards like Chromatic Sphere; Millikin; and Selvala, Explorer Returned.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/3B1TWrROCtDqRK61p5Nn3Q/cd2fac5794083963694e2087787fce41/CN2_Selvala__Explorer_Returned_960x540.jpg"
+  },
   {
    "title": "Secret Lair: My Arrakis, My Superdrop",
    "url": "https://magic.wizards.com/en/news/announcements/secret-lair-my-arrakis-my-superdrop",
@@ -51,14 +59,6 @@
    "image": "https://images.ctfassets.net/s5n2t79q9icq/3g0BJRJkK58qdhaP6aI1KL/e4195c66f630022f51656b857eef1194/NAU_PWG_1920x1080.webp"
   },
   {
-   "title": "Netflix Reveals Magic: The Gathering Animated Series PLANESWALKER",
-   "url": "https://magic.wizards.com/en/news/announcements/netflix-reveals-magic-the-gathering-animated-series-planeswalker",
-   "section": "Announcements",
-   "date": "2026-11-13",
-   "summary": "Step into the worlds of PLANESWALKER and meet the people who will shape them. Every great story begins with a spark. Here's your first look at PLANESWALKER, based on Magic: The Gathering. Coming to Netflix in 2027.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/L8M1wBB2xzbT4ArIrtyNc/c15395b81b0728f0267a36db03d304e7/Netflix_Planeswalker_VOD.webp"
-  },
-  {
    "title": "Magic: The Gathering® | Star Trek™ Update Bulletin",
    "url": "https://magic.wizards.com/en/news/announcements/star-trek-update-bulletin",
    "section": "Announcements",
@@ -97,6 +97,14 @@
    "date": "2026-10-30",
    "summary": "The Release Notes include info about the release of a new set, as well as clarifications and rulings involving that set's cards.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/6JZIWQVKMPBg3iz0JZhSbn/1d33334574c0d1862f941a33fdc35a8c/TRK-8001_IJNBTYDE_1920x1080_14.webp"
+  },
+  {
+   "title": "Magic: The Gathering® | Star Trek™ Commander Decklists",
+   "url": "https://magic.wizards.com/en/news/announcements/star-trek-commander-decklists",
+   "section": "Announcements",
+   "date": "2026-10-29",
+   "summary": "Bring the voyages and stories of Star Trek to your Commander games with four ready-to-play decks featuring the Federation, Klingons, Borg, and more!",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/2dmvMR90kZ4WQ2dtHnt7XD/2b2c69701fc5b6302d85b5427a915114/TRK_Austere_Command_1920x1080.webp"
   },
   {
    "title": "Where to Play Magic: The Gathering® | Star Trek™",
