@@ -1,15 +1,7 @@
 {
- "updated": "2026-11-25T20:38Z",
+ "updated": "2026-11-26T20:32Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
-  {
-   "title": "Design Files: Fifth Dawn, Part 4",
-   "url": "https://magic.wizards.com/en/news/making-magic/design-files-fifth-dawn-part-4",
-   "section": "Making Magic",
-   "date": "2026-11-23",
-   "summary": "Mark finishes his look back at the design file for Fifth Dawn, concluding the series with rare artifacts.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/1LCgykQbdZDvjTf7BXpqVZ/2bcbccd2235ceeb1ae272711f065aa4b/5DN_Crucible_of_Worlds_1920x1080webp.webp"
-  },
   {
    "title": "Arena Direct for Magic: The Gathering® | Star Trek™, December 4–13",
    "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
@@ -25,6 +17,14 @@
    "date": "2026-11-23",
    "summary": "Catch up with the latest info and events on MTG Arena.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
+  },
+  {
+   "title": "Design Files: Fifth Dawn, Part 4",
+   "url": "https://magic.wizards.com/en/news/making-magic/design-files-fifth-dawn-part-4",
+   "section": "Making Magic",
+   "date": "2026-11-23",
+   "summary": "Mark finishes his look back at the design file for Fifth Dawn, concluding the series with rare artifacts.",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/1LCgykQbdZDvjTf7BXpqVZ/2bcbccd2235ceeb1ae272711f065aa4b/5DN_Crucible_of_Worlds_1920x1080webp.webp"
   },
   {
    "title": "Magic Rules Blog: Mana Abilities",
@@ -65,14 +65,6 @@
    "date": "2026-11-13",
    "summary": "We breached the surface of Nauctis: The Sunken Realm at MagicCon: Atlanta! See what lies beneath the waves before the set releases on February 5, 2027.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/7lujIKXzBmD3KN7xmKR5EJ/ebd5b945abf64d2529661f3c5a143743/NAU_Salinae__the_Ocean_Mother_1920x1080.webp"
-  },
-  {
-   "title": "Planeswalker's Guide to Nauctis: The Sunken Realm",
-   "url": "https://magic.wizards.com/en/news/magic-story/planeswalkers-guide-to-nauctis-the-sunken-realm",
-   "section": "Magic Story",
-   "date": "2026-11-13",
-   "summary": "Explore Nauctis, a plane of endless ocean, from the merfolk of the Grand Marine to the desolators rising from the Abyss. You can follow the story of Nauctis: The Sunken Realm when the first episode arrives on January 4, 2027.",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/3g0BJRJkK58qdhaP6aI1KL/e4195c66f630022f51656b857eef1194/NAU_PWG_1920x1080.webp"
   },
   {
    "title": "Magic: The Gathering® | Star Trek™ Update Bulletin",
