@@ -1,15 +1,7 @@
 {
- "updated": "2026-11-27T20:18Z",
+ "updated": "2026-11-28T19:07Z",
  "source": "https://magic.wizards.com/en/news",
  "items": [
-  {
-   "title": "Arena Direct for Magic: The Gathering® | Star Trek™, December 4–13",
-   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
-   "section": "Mtg Arena",
-   "date": "2026-11-23",
-   "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
-   "image": "https://images.ctfassets.net/s5n2t79q9icq/3dNlqSzXpQVOAalXIAHf1J/ec7673fce1a7a25d369e4e4965648c75/SPa8x5pCPH.webp"
-  },
   {
    "title": "MTG Arena Announcements – November 23, 2026",
    "url": "https://magic.wizards.com/en/news/mtg-arena/announcements-november-23-2026",
@@ -17,6 +9,14 @@
    "date": "2026-11-23",
    "summary": "Catch up with the latest info and events on MTG Arena.",
    "image": "https://images.ctfassets.net/s5n2t79q9icq/1qqHUJ9cKYenQosEqhXIPD/968f0dfadd6c9b3841beb7a93058e210/en_articles_archive_magic-digital_mtg-arena-announcements-september-14-2022-meta-image.jpeg"
+  },
+  {
+   "title": "Arena Direct for Magic: The Gathering® | Star Trek™, December 4–13",
+   "url": "https://magic.wizards.com/en/news/mtg-arena/arena-direct",
+   "section": "Mtg Arena",
+   "date": "2026-11-23",
+   "summary": "Play MTG Arena and win physical Magic: The Gathering cards in Arena Direct events!",
+   "image": "https://images.ctfassets.net/s5n2t79q9icq/3dNlqSzXpQVOAalXIAHf1J/ec7673fce1a7a25d369e4e4965648c75/SPa8x5pCPH.webp"
   },
   {
    "title": "Design Files: Fifth Dawn, Part 4",
